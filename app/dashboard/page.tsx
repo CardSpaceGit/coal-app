@@ -1,0 +1,1485 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Menu, Plus, Truck, TrendingDown, Calendar, ChevronDown, Weight, Package } from "lucide-react"
+import { getSupabaseClient } from "@/lib/supabase"
+import { useAuth } from "@/hooks/useAuth"
+import type { Stock, Product, CoalYard } from "@/types/database"
+import Image from "next/image"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+// Remove this import since we're not using Tabs components anymore
+
+interface DashboardStats {
+  totalDeliveries: number
+  totalPickups: number
+  totalDeliveryWeight: number
+  totalPickupWeight: number
+  totalStock: number
+}
+
+interface StockWithDetails extends Stock {
+  product: Product
+  coal_yard: CoalYard
+}
+
+export default function DashboardPage() {
+  const { user, loading: authLoading, hasPermission } = useAuth()
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [stockData, setStockData] = useState<StockWithDetails[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedYardFilter, setSelectedYardFilter] = useState<string>("all")
+  const [dateRange, setDateRange] = useState({
+    start: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    end: new Date().toISOString().split("T")[0],
+  })
+  const [coalYards, setCoalYards] = useState<CoalYard[]>([])
+  const [showDateFilter, setShowDateFilter] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [selectedRecord, setSelectedRecord] = useState<any>(null)
+  const [recordType, setRecordType] = useState<'delivery' | 'pickup'>('delivery')
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const [showDropdownModal, setShowDropdownModal] = useState(false)
+  const [expandedContainers, setExpandedContainers] = useState<Set<string>>(new Set())
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [weeklyActivityData, setWeeklyActivityData] = useState<Record<string, { deliveries: any[]; pickups: any[] }>>(
+    {},
+  )
+  const [deliveryData, setDeliveryData] = useState<any[]>([])
+  const [activeTab, setActiveTab] = useState<"deliveries" | "pickups">("deliveries")
+  const [pickupData, setPickupData] = useState<any[]>([])
+  const [stockActivityTab, setStockActivityTab] = useState<"stock" | "activity">("stock")
+  const [allProducts, setAllProducts] = useState<Product[]>([])
+  const router = useRouter()
+  const supabase = getSupabaseClient()
+  const [showSideMenu, setShowSideMenu] = useState(false)
+
+  // Add this near the top of the component, after the existing useEffect
+  // useEffect(() => {
+  //   // This will refresh the data when the component is focused (e.g., when navigating back from deliveries)
+  //   const handleFocus = () => {
+  //     if (!authLoading && user) {
+  //       loadDashboardData()
+  //       loadCoalYards()
+  //       loadWeeklyActivityData()
+  //       loadDeliveryData()
+  //       loadPickupData()
+  //     }
+  //   }
+
+  //   window.addEventListener("focus", handleFocus)
+
+  //   return () => {
+  //     window.removeEventListener("focus", handleFocus)
+  //   }
+  // }, [authLoading, user])
+
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        router.push("/login")
+        return
+      }
+      loadDashboardData()
+      loadCoalYards()
+      loadWeeklyActivityData()
+      loadDeliveryData()
+      loadPickupData()
+      loadAllProducts()
+    }
+  }, [authLoading, user, selectedYardFilter, dateRange])
+
+  const loadDashboardData = async () => {
+    if (!user?.organization?.id) return
+
+    try {
+      setLoading(true)
+
+      // Use date range for filtering
+      const startDate = dateRange.start
+      const endDate = dateRange.end
+
+      let deliveriesQuery = supabase
+        .from("deliveries")
+        .select("weight_tons, coal_yard_id")
+        .eq("organization_id", user.organization.id)
+        .gte("delivery_date", startDate)
+        .lte("delivery_date", endDate)
+
+      let pickupsQuery = supabase
+        .from("pickup")
+        .select("weight_tons, coal_yard_id")
+        .eq("organization_id", user.organization.id)
+        .gte("pickup_date", startDate)
+        .lte("pickup_date", endDate)
+
+      let stockQuery = supabase
+        .from("stock")
+        .select("*")
+        .eq("organization_id", user.organization.id)
+
+      // Apply coal yard filter if not "all"
+      if (selectedYardFilter !== "all") {
+        deliveriesQuery = deliveriesQuery.eq("coal_yard_id", selectedYardFilter)
+        pickupsQuery = pickupsQuery.eq("coal_yard_id", selectedYardFilter)
+        stockQuery = stockQuery.eq("coal_yard_id", selectedYardFilter)
+      }
+
+      const [deliveries, pickups, stock] = await Promise.all([deliveriesQuery, pickupsQuery, stockQuery])
+
+      // Get product and coal yard details separately to populate stock data
+      const productIds = [...new Set(stock.data?.map(s => s.product_id) || [])]
+      const coalYardIds = [...new Set(stock.data?.map(s => s.coal_yard_id) || [])]
+
+      const [products, coalYardsData] = await Promise.all([
+        supabase.from("products").select("*").in("id", productIds),
+        supabase.from("coal_yards").select("*").in("id", coalYardIds)
+      ])
+
+      // Combine stock data with product and coal yard details
+      const stockWithDetails = stock.data?.map(s => ({
+        ...s,
+        product: products.data?.find(p => p.id === s.product_id) || null,
+        coal_yard: coalYardsData.data?.find(cy => cy.id === s.coal_yard_id) || null
+      })) || []
+
+      // Calculate stats
+      const totalDeliveryWeight = deliveries.data?.reduce((sum, d) => sum + Number(d.weight_tons), 0) || 0
+      const totalPickupWeight = pickups.data?.reduce((sum, p) => sum + Number(p.weight_tons), 0) || 0
+      const totalStock = stock.data?.reduce((sum, s) => sum + Number(s.current_weight_tons), 0) || 0
+
+      setStats({
+        totalDeliveries: deliveries.data?.length || 0,
+        totalPickups: pickups.data?.length || 0,
+        totalDeliveryWeight,
+        totalPickupWeight,
+        totalStock,
+      })
+
+      setStockData(stockWithDetails as any)
+    } catch (error) {
+      console.error("Error loading dashboard data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadCoalYards = async () => {
+    if (!user?.organization?.id) return
+    
+    try {
+      // Get coal yards that have stock for this organization
+      const { data: stockData } = await supabase
+        .from("stock")
+        .select("coal_yard_id")
+        .eq("organization_id", user.organization.id)
+      
+      if (!stockData || stockData.length === 0) {
+        setCoalYards([])
+        return
+      }
+
+      const coalYardIds = [...new Set(stockData.map(s => s.coal_yard_id))]
+      
+      const { data } = await supabase
+        .from("coal_yards")
+        .select("*")
+        .in("id", coalYardIds)
+        .order("name")
+      
+      if (data) setCoalYards(data as CoalYard[])
+    } catch (error) {
+      console.error("Error loading coal yards:", error)
+    }
+  }
+
+  const loadWeeklyActivityData = async () => {
+    if (!user?.organization?.id) return
+
+    try {
+      const startDate = dateRange.start
+      const endDate = dateRange.end
+
+      // Get coal yards that have stock for this organization (independent of coalYards state)
+      const { data: stockData } = await supabase
+        .from("stock")
+        .select("coal_yard_id")
+        .eq("organization_id", user.organization.id)
+      
+      if (!stockData || stockData.length === 0) {
+        setWeeklyActivityData({})
+        return
+      }
+
+      const coalYardIds = [...new Set(stockData.map(s => s.coal_yard_id))]
+      
+      const { data: yards } = await supabase
+        .from("coal_yards")
+        .select("*")
+        .in("id", coalYardIds)
+        .order("name")
+
+      // Get deliveries for the date range with organization filter
+      const { data: deliveries } = await supabase
+        .from("deliveries")
+        .select("delivery_date, weight_tons, coal_yard_id")
+        .eq("organization_id", user.organization.id)
+        .gte("delivery_date", startDate)
+        .lte("delivery_date", endDate)
+
+      // Get pickups for the date range with organization filter (updated for new structure)
+      const { data: pickups } = await supabase
+        .from("pickup")
+        .select("pickup_date, weight_tons, coal_yard_id")
+        .eq("organization_id", user.organization.id)
+        .gte("pickup_date", startDate)
+        .lte("pickup_date", endDate)
+
+      // Group data by coal yard
+      const activityByYard: Record<string, { deliveries: any[]; pickups: any[] }> = {}
+
+      yards?.forEach((yard) => {
+        activityByYard[yard.id] = { deliveries: [], pickups: [] }
+      })
+
+      deliveries?.forEach((delivery: any) => {
+        if (activityByYard[delivery.coal_yard_id]) {
+          activityByYard[delivery.coal_yard_id].deliveries.push(delivery)
+        }
+      })
+
+      pickups?.forEach((pickup: any) => {
+        if (activityByYard[pickup.coal_yard_id]) {
+          activityByYard[pickup.coal_yard_id].pickups.push(pickup)
+        }
+      })
+
+      setWeeklyActivityData(activityByYard)
+    } catch (error) {
+      console.error("Error loading weekly activity data:", error)
+    }
+  }
+
+  const loadDeliveryData = async () => {
+    if (!user?.organization?.id) return
+
+    try {
+      // First check if any deliveries exist for this organization
+      const { count } = await supabase
+        .from("deliveries")
+        .select("*", { count: 'exact', head: true })
+        .eq("organization_id", user.organization.id)
+
+      console.log("Total deliveries for organization:", count)
+
+      // First try a simpler query to see if data exists
+      const { data: deliveries, error } = await supabase
+        .from("deliveries")
+        .select(`
+          *,
+          coal_yard:coal_yards(name, code),
+          product:products(name, image_url)
+        `)
+        .eq("organization_id", user.organization.id)
+        .order("delivery_date", { ascending: false })
+        .limit(20)
+
+      if (error) {
+        console.error("Error in delivery query:", error)
+        return
+      }
+
+      console.log("Delivery data loaded:", deliveries?.length || 0, "records")
+      console.log("First delivery sample:", deliveries?.[0])
+      if (deliveries) setDeliveryData(deliveries)
+    } catch (error) {
+      console.error("Error loading delivery data:", error)
+    }
+  }
+
+  const loadPickupData = async () => {
+    if (!user?.organization?.id) return
+
+    try {
+      // First check if any pickups exist for this organization
+      const { count } = await supabase
+        .from("pickup")
+        .select("*", { count: 'exact', head: true })
+        .eq("organization_id", user.organization.id)
+
+      console.log("Total pickups for organization:", count)
+
+      // First try a simpler query to see if data exists
+      const { data: pickups, error } = await supabase
+        .from("pickup")
+        .select(`
+          *,
+          coal_yard:coal_yards(name, code),
+          product:products(name, image_url)
+        `)
+        .eq("organization_id", user.organization.id)
+        .order("pickup_date", { ascending: false })
+        .limit(20)
+
+      if (error) {
+        console.error("Error in pickup query:", error)
+        return
+      }
+
+      console.log("Pickup data loaded:", pickups?.length || 0, "records")
+      console.log("First pickup sample:", pickups?.[0])
+      if (pickups?.[0]) {
+        console.log("Pickup structure - pickup_containers:", pickups[0].pickup_containers)
+        console.log("Pickup fields:", Object.keys(pickups[0]))
+      }
+      if (pickups) setPickupData(pickups)
+    } catch (error) {
+      console.error("Error loading pickup data:", error)
+    }
+  }
+
+  const loadAllProducts = async () => {
+    try {
+      const { data: products } = await supabase
+        .from("products")
+        .select("*")
+        .order("name")
+
+      if (products) setAllProducts(products as Product[])
+    } catch (error) {
+      console.error("Error loading all products:", error)
+    }
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push("/login")
+  }
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
+
+  // Calculate product stock by type, including all products (even those with 0 stock)
+  const productStockByType = allProducts.reduce(
+    (acc, product) => {
+      const productName = product.name
+      const stockForProduct = stockData.filter(stock => stock.product.name === productName)
+      const totalStock = stockForProduct.reduce((sum, stock) => sum + Number(stock.current_weight_tons), 0)
+      acc[productName] = { weight: totalStock, product }
+      return acc
+    },
+    {} as Record<string, { weight: number; product: Product }>,
+  )
+
+  const toggleContainer = (containerId: string) => {
+    const newExpanded = new Set(expandedContainers)
+    if (newExpanded.has(containerId)) {
+      newExpanded.delete(containerId)
+    } else {
+      newExpanded.add(containerId)
+    }
+    setExpandedContainers(newExpanded)
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <div className="bg-gray-900 text-white relative overflow-hidden">
+        <div className="absolute inset-0 opacity-20">
+          <Image src="/images/coal-texture.png" alt="Coal texture background" fill className="object-cover" priority />
+        </div>
+        <div className="relative z-10 p-4">
+          <div className="flex items-center justify-between mb-6">
+            <Button variant="ghost" size="icon" className="text-white" onClick={() => setShowSideMenu(true)}>
+              <Menu className="h-6 w-6" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full overflow-hidden"
+                onClick={() => router.push("/profile")}
+              >
+                {user.avatar_url ? (
+                  <Image
+                    src={user.avatar_url || "/placeholder.svg"}
+                    alt="Profile"
+                    width={40}
+                    height={40}
+                    className="rounded-full"
+                  />
+                ) : (
+                  <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-semibold">{user.full_name.charAt(0).toUpperCase()}</span>
+                  </div>
+                )}
+              </Button>
+            </div>
+          </div>
+          <div className="mb-4">
+            <h1 className="text-2xl font-light">
+              Hi <span className="font-bold">{user.full_name}</span>,{" "}
+              <span className="italic">here's what's happening.</span>
+            </h1>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-sm text-gray-300">{user.organization?.name}</span>
+              <span className="text-xs bg-yellow-500 text-gray-900 px-3 py-1 rounded-full font-medium">{user.role?.name}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-6 -mt-4 pb-24">
+        {/* Current Stock Gauge */}
+        <Card className="bg-white shadow-lg rounded-2xl">
+          <CardContent className="p-6">
+            {/* Filter Controls */}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">Dashboard</h2>
+
+              <div className="flex items-center gap-3">
+                <Select value={selectedYardFilter} onValueChange={setSelectedYardFilter}>
+                  <SelectTrigger className="w-32 h-10 rounded-full border-2 border-gray-300 bg-white">
+                    <div className="flex items-center gap-2">
+                      <SelectValue placeholder="All">
+                        {selectedYardFilter === "all"
+                          ? "All"
+                          : coalYards.find((yard) => yard.id === selectedYardFilter)?.code || "All"}
+                      </SelectValue>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    {coalYards.map((yard) => (
+                      <SelectItem key={yard.id} value={yard.id}>
+                        {yard.code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Filter and Edit Buttons */}
+                <div className="flex items-center gap-2">
+                  <Dialog open={showDateFilter} onOpenChange={setShowDateFilter}>
+                    <DialogTrigger asChild>
+                      <Button className="w-10 h-10 rounded-full bg-yellow-500 hover:bg-yellow-600 text-gray-800 flex items-center justify-center">
+                        <Calendar className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="!fixed !inset-x-0 !bottom-0 !top-auto !left-0 !right-0 !transform-none !translate-x-0 !translate-y-0 mx-0 max-w-none !w-screen h-auto max-h-[80vh] rounded-t-3xl !rounded-b-none border-0 p-0 m-0 animate-slide-in-from-bottom-full data-[state=closed]:animate-slide-out-to-bottom-full [&>button]:hidden">
+                      <div className="flex flex-col w-full">
+                        <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
+                          <DialogTitle className="text-xl font-bold text-gray-800">Filter by Date Range</DialogTitle>
+                        </DialogHeader>
+                        <div className="flex-1 p-6 space-y-4 overflow-y-auto">
+                          <div>
+                            <Label className="text-sm font-medium">Start Date</Label>
+                            <Input
+                              type="date"
+                              value={dateRange.start}
+                              onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium">End Date</Label>
+                            <Input
+                              type="date"
+                              value={dateRange.end}
+                              onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setShowDateFilter(false)}>
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                loadDashboardData()
+                                setShowDateFilter(false)
+                              }}
+                              className="bg-yellow-500 hover:bg-yellow-600 text-gray-800"
+                            >
+                              Apply Filter
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+                    <DialogContent className="!fixed !inset-x-0 !bottom-0 !top-auto !left-0 !right-0 !transform-none !translate-x-0 !translate-y-0 mx-0 max-w-none !w-screen h-auto max-h-[80vh] rounded-t-3xl !rounded-b-none border-0 p-0 m-0 animate-slide-in-from-bottom-full data-[state=closed]:animate-slide-out-to-bottom-full [&>button]:hidden">
+                      <div className="flex flex-col w-full">
+                        <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
+                          <DialogTitle className="text-xl font-bold text-gray-800">Select Coal Yard to Edit</DialogTitle>
+                        </DialogHeader>
+                        <div className="flex-1 p-6 space-y-4 max-h-[50vh] overflow-y-auto">
+                          {coalYards.map((yard) => (
+                            <Button
+                              key={yard.id}
+                              variant="outline"
+                              className="w-full justify-start h-12"
+                              onClick={() => {
+                                router.push(`/admin/coal-yards/${yard.id}/edit`)
+                                setShowEditModal(false)
+                              }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
+                                  <span className="text-sm font-semibold">{yard.code}</span>
+                                </div>
+                                <div className="text-left">
+                                  <p className="font-medium">{yard.name}</p>
+                                  <p className="text-sm text-gray-500">{yard.code}</p>
+                                </div>
+                              </div>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+            </div>
+
+            {/* Date Range Display */}
+            <div className="flex items-center gap-4 text-gray-600 mb-6 bg-gray-50 p-3 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                <span className="text-sm">
+                  {new Date(dateRange.start).toLocaleDateString("en-US", {
+                    weekday: "short",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+              <span className="text-gray-400">|</span>
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                <span className="text-sm">
+                  {new Date(dateRange.end).toLocaleDateString("en-US", {
+                    weekday: "short",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+            </div>
+
+            <div className="w-full">
+              <div className="flex space-x-8 mb-6">
+                <button
+                  onClick={() => setStockActivityTab("stock")}
+                  className={`text-3xl pb-1 transition-all ${
+                    stockActivityTab === "stock"
+                      ? "font-bold text-gray-800 border-b-2 border-gray-800"
+                      : "font-light text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Current Stock
+                </button>
+                <button
+                  onClick={() => setStockActivityTab("activity")}
+                  className={`text-3xl pb-1 transition-all ${
+                    stockActivityTab === "activity"
+                      ? "font-bold text-gray-800 border-b-2 border-gray-800"
+                      : "font-light text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Weekly Activity
+                </button>
+              </div>
+
+              {/* Current Stock Content */}
+              {stockActivityTab === "stock" && (
+                <div className="mt-0">
+                  {/* Current Stock Content */}
+                  <div className="flex items-center justify-center mb-6">
+                    <div className="relative w-[350px] h-[350px]">
+                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="40" stroke="#e5e7eb" strokeWidth="8" fill="none" />
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          stroke="#374151"
+                          strokeWidth="8"
+                          fill="none"
+                          strokeDasharray={`${(stats?.totalStock || 0) / 100} 251.2`}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <p className="text-lg text-gray-600 mb-2">Total available stock</p>
+                        <p className="text-5xl font-bold text-gray-800">{stats?.totalStock.toLocaleString() || 0} t</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Weekly Metrics */}
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600 mb-1">Total Deliveries</p>
+                      <p className="text-2xl font-bold text-gray-800">
+                        {stats?.totalDeliveryWeight.toLocaleString() || 0} t
+                      </p>
+                      <p className="text-xs text-gray-500">Last updated: {new Date().toLocaleDateString()}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600 mb-1">Total Pickups</p>
+                      <p className="text-2xl font-bold text-gray-800">
+                        {stats?.totalPickupWeight.toLocaleString() || 0} t
+                      </p>
+                      <p className="text-xs text-gray-500">Last updated: {new Date().toLocaleDateString()}</p>
+                    </div>
+                  </div>
+
+                  {/* Product Stock Chart */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-800">Product Inventory</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {Object.entries(productStockByType).map(([productName, { weight, product }]) => {
+                        const maxWeight = Math.max(...Object.values(productStockByType).map(p => p.weight))
+                        const percentage = maxWeight > 0 ? (weight / maxWeight) * 100 : 0
+                        const stockpileNumber = allProducts.findIndex(p => p.name === productName) + 1
+
+                        return (
+                          <div key={productName} className="flex flex-col items-center">
+                            {/* Weight Display */}
+                            <div className="text-lg font-bold text-gray-800 mb-2">{weight.toLocaleString()} t</div>
+
+                            {/* Vertical Bar */}
+                            <div className="w-16 h-32 bg-gray-200 rounded-lg flex items-end mb-3">
+                              <div
+                                className="w-full bg-gray-800 rounded-lg transition-all duration-300"
+                                style={{ height: `${percentage}%` }}
+                              />
+                            </div>
+
+                            {/* Product Image */}
+                            <div className="w-12 h-12 mb-2">
+                              <Image
+                                src={product?.image_url || "/placeholder.svg?height=48&width=48&text=Coal"}
+                                alt={productName}
+                                width={48}
+                                height={48}
+                                className="w-full h-full object-cover rounded-lg"
+                              />
+                            </div>
+
+                            {/* Product Name and Stockpile */}
+                            <div className="text-center">
+                              <p className="font-semibold text-gray-800 text-sm">{productName}</p>
+                              <p className="text-xs text-gray-500">Stockpile {stockpileNumber}</p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {stockActivityTab === "activity" && (
+                <div className="mt-0">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                    {/* Deliveries Section */}
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-800 mb-4">Deliveries</h3>
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600"># of Deliveries:</span>
+                          <span className="font-semibold">{stats?.totalDeliveries || 0}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Total delivered weight:</span>
+                          <span className="font-bold text-lg ml-2">
+                            {stats?.totalDeliveryWeight.toLocaleString() || 0} t
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pickups Section */}
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-800 mb-4">Pickups</h3>
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600"># of Pickups:</span>
+                          <span className="font-semibold">{stats?.totalPickups || 0}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Total pickup weight:</span>
+                          <span className="font-bold text-lg ml-2">
+                            {stats?.totalPickupWeight.toLocaleString() || 0} t
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Legend */}
+                  <div className="flex items-center justify-center gap-6 mb-6">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span className="text-sm text-gray-600">Delivery</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                      <span className="text-sm text-gray-600">Pick up</span>
+                    </div>
+                  </div>
+
+                  {/* Weekly Activity Grid */}
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-semibold text-gray-800 mb-4">Weekly Activity Overview</h4>
+                    {coalYards.map((yard) => {
+                      const yardActivity = weeklyActivityData[yard.id] || { deliveries: [], pickups: [] }
+
+                      return (
+                        <div key={yard.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center">
+                              <span className="text-white font-bold text-sm">{yard.code}</span>
+                            </div>
+                            <div>
+                              <h5 className="font-semibold text-gray-800">{yard.name}</h5>
+                              <p className="text-sm text-gray-500">{yard.code}</p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-7 gap-1 mb-3">
+                            {Array.from({ length: 7 }, (_, i) => {
+                              const date = new Date(dateRange.start)
+                              date.setDate(date.getDate() + i)
+                              return (
+                                <div key={i} className="text-center">
+                                  <div className="text-xs text-gray-500 mb-1">
+                                    {date.toLocaleDateString("en-US", { weekday: "short" })}
+                                  </div>
+                                  <div className="text-xs font-medium text-gray-600">{date.getDate()}</div>
+                                </div>
+                              )
+                            })}
+                          </div>
+
+                          <div className="grid grid-cols-7 gap-1">
+                            {Array.from({ length: 7 }, (_, i) => {
+                              const date = new Date(dateRange.start)
+                              date.setDate(date.getDate() + i)
+                              const dateString = date.toISOString().split("T")[0]
+
+                              // Get deliveries for this date
+                              const dayDeliveries = yardActivity.deliveries.filter(
+                                (d) => d.delivery_date === dateString,
+                              )
+                              const deliveryWeight = dayDeliveries.reduce((sum, d) => sum + Number(d.weight_tons), 0)
+
+                              // Get pickups for this date
+                              const dayPickups = yardActivity.pickups.filter((p) => p.pickup_date === dateString)
+                              const pickupWeight = dayPickups.reduce((sum, p) => sum + Number(p.weight_tons), 0)
+
+                              const hasDelivery = deliveryWeight > 0
+                              const hasPickup = pickupWeight > 0
+
+                              return (
+                                <div key={i} className="space-y-1">
+                                  {hasDelivery && (
+                                    <div className="bg-green-500 text-white text-xs font-medium px-1 py-1 rounded text-center">
+                                      +{Math.round(deliveryWeight)}t
+                                    </div>
+                                  )}
+                                  {hasPickup && (
+                                    <div className="bg-red-500 text-white text-xs font-medium px-1 py-1 rounded text-center">
+                                      -{Math.round(pickupWeight)}t
+                                    </div>
+                                  )}
+                                  {!hasDelivery && !hasPickup && (
+                                    <div className="bg-gray-200 text-gray-400 text-xs font-medium px-1 py-1 rounded text-center h-6 flex items-center justify-center">
+                                      —
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+
+                          {/* Summary for this yard */}
+                          <div className="mt-4 pt-3 border-t border-gray-300 flex justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              <span className="text-gray-600">
+                                {Math.round(yardActivity.deliveries.reduce((sum, d) => sum + Number(d.weight_tons), 0))}
+                                t delivered
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                              <span className="text-gray-600">
+                                {Math.round(
+                                  yardActivity.pickups.reduce((sum, p) => sum + Number(p.weight_tons), 0)
+                                )}
+                                t picked up
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Deliveries and Pickups List */}
+        <Card className="bg-white shadow-lg rounded-2xl">
+          <CardContent className="p-6">
+            <div className="flex space-x-8 mb-6">
+              <button
+                onClick={() => setActiveTab("deliveries")}
+                className={`text-3xl pb-1 transition-all ${
+                  activeTab === "deliveries"
+                    ? "font-bold text-gray-800 border-b-2 border-gray-800"
+                    : "font-light text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Deliveries
+              </button>
+              <button
+                onClick={() => setActiveTab("pickups")}
+                className={`text-3xl pb-1 transition-all ${
+                  activeTab === "pickups"
+                    ? "font-bold text-gray-800 border-b-2 border-gray-800"
+                    : "font-light text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Pickups
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {activeTab === "deliveries" ? (
+                // Deliveries content
+                <>
+                  {Object.entries(
+                    (deliveryData as any[]).reduce(
+                      (groups: Record<string, any[]>, delivery: any) => {
+                        const date = new Date(delivery.delivery_date).toLocaleDateString("en-US", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })
+                        if (!groups[date]) groups[date] = []
+                        groups[date].push(delivery)
+                        return groups
+                      },
+                      {} as Record<string, any[]>,
+                    ),
+                  ).map(([date, deliveries]: [string, any[]]) => (
+                    <div key={date}>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="bg-gray-100 p-2 rounded-lg">
+                          <Calendar className="h-5 w-5 text-gray-700" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-800">{date}</h3>
+                      </div>
+
+                      <div className="space-y-3">
+                        {deliveries.map((delivery: any) => {
+                          const isExpanded = expandedContainers.has(delivery.id)
+                          return (
+                            <div key={delivery.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                              <div
+                                className="flex items-center justify-between cursor-pointer"
+                                onClick={() => toggleContainer(delivery.id)}
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className="bg-gray-800 p-3 rounded-lg">
+                                    <Truck className="h-6 w-6 text-white" />
+                                  </div>
+                                  <div>
+                                    <p className="font-semibold text-gray-800 text-lg">
+                                      Weighbridge Number {delivery.weighbridge_slip || delivery.id || "N/A"}
+                                    </p>
+                                    <div className="flex items-center gap-4 text-gray-600 text-sm mt-1">
+                                      <div className="flex items-center gap-1">
+                                        <Weight className="h-4 w-4" />
+                                        <span>{delivery.weight_tons?.toLocaleString()}t</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <Package className="h-4 w-4" />
+                                        <span>1</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setSelectedRecord(delivery)
+                                      setRecordType('delivery')
+                                      setShowDropdownModal(true)
+                                    }}
+                                    className="p-2 hover:bg-gray-100 rounded-lg"
+                                  >
+                                    <svg className="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                    </svg>
+                                  </button>
+                                  <ChevronDown
+                                    className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                  />
+                                </div>
+                              </div>
+
+                              {isExpanded && (
+                                <div className="mt-4 pt-4 border-t border-gray-200">
+                                  <p className="font-semibold text-gray-800 mb-4">Products:</p>
+                                  
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                                      <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
+                                          <Image
+                                            src={delivery.product?.image_url || "/placeholder.svg?height=48&width=48&text=Coal"}
+                                            alt={delivery.product?.name || "Product"}
+                                            width={48}
+                                            height={48}
+                                            className="w-10 h-10 object-cover rounded"
+                                          />
+                                        </div>
+                                        <div>
+                                          <p className="font-semibold text-gray-800">{delivery.product?.name}</p>
+                                          <p className="text-sm text-gray-500">Stockpile 1</p>
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-xl font-bold text-gray-800">{delivery.weight_tons?.toLocaleString()} t</p>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-4 pt-4 border-t border-gray-200 space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Delivered by:</span>
+                                      <span className="font-medium">{delivery.created_by || 'N/A'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Coal Yard:</span>
+                                      <span className="font-medium">{delivery.coal_yard?.name}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Date:</span>
+                                      <span className="font-medium">{new Date(delivery.delivery_date).toLocaleDateString()}</span>
+                                    </div>
+                                    {delivery.notes && (
+                                      <div className="mt-3">
+                                        <span className="text-gray-600">Notes:</span>
+                                        <p className="text-gray-700 mt-1">{delivery.notes}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+
+                  {deliveryData.length === 0 && (
+                    <div className="text-center py-8">
+                      {/* Empty state image */}
+                      <div className="mb-6">
+                        <div className="w-300 h-300 flex items-center justify-center mx-auto mb-4">
+                          <Image
+                            src="/images/empty.png"
+                            alt="No deliveries"
+                            width={300}
+                            height={300}
+                            className="w-64 h-64 object-contain"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-gray-500 text-lg">No deliveries found</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                // Pickups content
+                <>
+                  {Object.entries(
+                    (pickupData as any[]).reduce(
+                      (groups: Record<string, any[]>, pickup: any) => {
+                        const date = new Date(pickup.pickup_date).toLocaleDateString("en-US", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })
+                        if (!groups[date]) groups[date] = []
+                        groups[date].push(pickup)
+                        return groups
+                      },
+                      {} as Record<string, any[]>,
+                    ),
+                  ).map(([date, pickups]: [string, any[]]) => (
+                    <div key={date}>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="bg-gray-100 p-2 rounded-lg">
+                          <Calendar className="h-5 w-5 text-gray-700" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-800">{date}</h3>
+                      </div>
+
+                      <div className="space-y-3">
+                        {pickups.map((pickup: any) => {
+                          const isExpanded = expandedContainers.has(pickup.id)
+                          const totalWeight = pickup.weight_tons || 0
+                          const containerCount = pickup.pickup_containers?.length || 1
+
+                          return (
+                            <div key={pickup.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                              <div
+                                className="flex items-center justify-between cursor-pointer"
+                                onClick={() => toggleContainer(pickup.id)}
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className="bg-gray-800 p-3 rounded-lg">
+                                    <TrendingDown className="h-6 w-6 text-white" />
+                                  </div>
+                                  <div>
+                                    <p className="font-semibold text-gray-800 text-lg">
+                                      Container SARU | {pickup.container_number || pickup.weighbridge_slip || pickup.id || "N/A"}
+                                    </p>
+                                    <div className="flex items-center gap-4 text-gray-600 text-sm mt-1">
+                                      <div className="flex items-center gap-1">
+                                        <Weight className="h-4 w-4" />
+                                        <span>{totalWeight?.toLocaleString()}t</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <Package className="h-4 w-4" />
+                                        <span>{containerCount}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setSelectedRecord(pickup)
+                                      setRecordType('pickup')
+                                      setShowDropdownModal(true)
+                                    }}
+                                    className="p-2 hover:bg-gray-100 rounded-lg"
+                                  >
+                                    <svg className="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                    </svg>
+                                  </button>
+                                  <ChevronDown
+                                    className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                  />
+                                </div>
+                              </div>
+
+                              {isExpanded && (
+                                <div className="mt-4 pt-4 border-t border-gray-200">
+                                  <p className="font-semibold text-gray-800 mb-4">Products:</p>
+                                  
+                                  <div className="space-y-3">
+                                    {pickup.pickup_containers?.map((container: any, index: number) => 
+                                      container.pickup_container_products?.map((containerProduct: any, productIndex: number) => (
+                                        <div key={`${container.id}-${productIndex}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                                          <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
+                                              <Image
+                                                src={containerProduct.product?.image_url || "/placeholder.svg?height=48&width=48&text=Coal"}
+                                                alt={containerProduct.product?.name || "Product"}
+                                                width={48}
+                                                height={48}
+                                                className="w-10 h-10 object-cover rounded"
+                                              />
+                                            </div>
+                                            <div>
+                                              <p className="font-semibold text-gray-800">{containerProduct.product?.name}</p>
+                                              <p className="text-sm text-gray-500">Stockpile {productIndex + 1}</p>
+                                            </div>
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="text-xl font-bold text-gray-800">{containerProduct.weight_tons?.toLocaleString()} t</p>
+                                          </div>
+                                        </div>
+                                      ))
+                                    ) || (
+                                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                                        <div className="flex items-center gap-4">
+                                          <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
+                                            <Image
+                                              src="/placeholder.svg?height=48&width=48&text=Coal"
+                                              alt="Product"
+                                              width={48}
+                                              height={48}
+                                              className="w-10 h-10 object-cover rounded"
+                                            />
+                                          </div>
+                                          <div>
+                                            <p className="font-semibold text-gray-800">Mixed Products</p>
+                                            <p className="text-sm text-gray-500">Stockpile 1</p>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <p className="text-xl font-bold text-gray-800">{totalWeight?.toLocaleString()} t</p>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="mt-4 pt-4 border-t border-gray-200 space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Picked up by:</span>
+                                      <span className="font-medium">{pickup.created_by || 'N/A'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Coal Yard:</span>
+                                      <span className="font-medium">{pickup.coal_yard?.name}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Date:</span>
+                                      <span className="font-medium">{new Date(pickup.pickup_date).toLocaleDateString()}</span>
+                                    </div>
+                                    {pickup.weighbridge_slip && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600">Weighbridge Slip:</span>
+                                        <span className="font-medium">{pickup.weighbridge_slip}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+
+                  {pickupData.length === 0 && (
+                    <div className="text-center py-8">
+                      {/* Empty state image */}
+                      <div className="mb-6">
+                        <div className="w-64 h-64 flex items-center justify-center mx-auto mb-4">
+                          <Image
+                            src="/images/empty.png"
+                            alt="No pickups"
+                            width={250}
+                            height={250}
+                            className="w-64 h-64 object-contain"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-gray-500">No pickups found</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Floating Action Button */}
+      <div className="fixed bottom-6 right-6">
+        <Button
+          size="lg"
+          className="h-14 w-14 rounded-full bg-yellow-500 hover:bg-yellow-600 text-gray-800 shadow-lg"
+          onClick={() => setShowAddModal(true)}
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      </div>
+
+      {/* Add Modal */}
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent className="!fixed !inset-x-0 !bottom-0 !top-auto !left-0 !right-0 !transform-none !translate-x-0 !translate-y-0 mx-0 max-w-none !w-screen h-auto max-h-[80vh] rounded-t-3xl !rounded-b-none border-0 p-0 m-0 animate-slide-in-from-bottom-full data-[state=closed]:animate-slide-out-to-bottom-full [&>button]:hidden">
+          <div className="flex flex-col w-full">
+            <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
+              <DialogTitle className="text-xl font-bold text-gray-800">Add new deliveries or pick ups</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 p-6 space-y-4 overflow-y-auto">
+              <Button
+                variant="outline"
+                className="w-full h-20 justify-start border-2 border-gray-200 hover:border-yellow-500 hover:bg-yellow-50"
+                onClick={() => {
+                  setShowAddModal(false)
+                  router.push("/deliveries")
+                }}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
+                    <Truck className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="font-semibold text-gray-800 text-lg">Add deliveries</h3>
+                    <p className="text-sm text-gray-500">Load coming in to the yard</p>
+                  </div>
+                </div>
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full h-20 justify-start border-2 border-gray-200 hover:border-yellow-500 hover:bg-yellow-50"
+                onClick={() => {
+                  setShowAddModal(false)
+                  router.push("/pickups")
+                }}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
+                    <TrendingDown className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="font-semibold text-gray-800 text-lg">Add pickups</h3>
+                    <p className="text-sm text-gray-500">Load going out of the yard</p>
+                  </div>
+                </div>
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Slide-out Menu */}
+      {showSideMenu && (
+        <div className="fixed inset-0 z-50">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowSideMenu(false)} />
+
+          {/* Slide-out Panel */}
+          <div
+            className={`absolute left-0 top-0 h-full w-[30%] bg-gray-400 transform transition-transform duration-300 ease-in-out ${showSideMenu ? "translate-x-0" : "-translate-x-full"}`}
+          >
+            {/* Background Image */}
+            <div className="absolute inset-0">
+              <Image
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-fpCROtueB4PgwWN8KyRDy1GesDbbBn.png"
+                alt="Coal background"
+                fill
+                className="object-cover"
+                priority
+              />
+              <div className="absolute inset-0 bg-black/20" />
+            </div>
+
+            {/* Content */}
+            <div className="relative z-10 flex flex-col justify-between min-h-screen p-6">
+              <div className="flex-1 flex flex-col justify-center">
+                {/* Logo */}
+                <div className="mb-8">
+                  <div className="flex items-center mb-4">
+                    <div className="text-4xl font-bold">
+                      <span className="text-yellow-500">FT</span>
+                      <span className="text-white">COAL</span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-white/90 font-medium">supply & logistics</p>
+                </div>
+
+                {/* Main Content */}
+                <div className="text-white mb-16">
+                  <h1 className="text-4xl font-light leading-tight mb-6">
+                    Ensure accuracy, improve productivity, and make informed decisions with ease.
+                  </h1>
+
+                  <p className="text-lg font-light opacity-90 leading-relaxed">
+                    Designed to simplify and enhance the management of your coal yard operations.
+                  </p>
+                </div>
+              </div>
+
+              {/* Bottom Section */}
+              <div className="space-y-6">
+                {/* Log Out Button */}
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center justify-between w-full text-white text-xl font-light py-4 border-b border-white/20"
+                >
+                  <span>Log Out</span>
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+
+                {/* Footer */}
+                <p className="text-sm text-white/75">Build and powered by FT Coal © 2024.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Record Modal */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="!fixed !inset-x-0 !bottom-0 !top-auto !left-0 !right-0 !transform-none !translate-x-0 !translate-y-0 mx-0 max-w-none !w-screen h-auto max-h-[80vh] rounded-t-3xl !rounded-b-none border-0 p-0 m-0 animate-slide-in-from-bottom-full data-[state=closed]:animate-slide-out-to-bottom-full [&>button]:hidden">
+          <div className="flex flex-col w-full">
+            <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
+              <DialogTitle className="text-xl font-bold text-gray-800">
+                Edit {recordType === 'delivery' ? 'Delivery' : 'Pickup'} Record
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 p-6">
+              <p className="text-gray-600 mb-4">
+                Editing functionality will be implemented here. Selected record ID: {selectedRecord?.id}
+              </p>
+              <div className="flex gap-4">
+                <Button
+                  onClick={() => setShowEditModal(false)}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    // TODO: Implement edit functionality
+                    setShowEditModal(false)
+                  }}
+                  className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-gray-800"
+                >
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Record Modal */}
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent className="!fixed !inset-x-0 !bottom-0 !top-auto !left-0 !right-0 !transform-none !translate-x-0 !translate-y-0 mx-0 max-w-none !w-screen h-auto max-h-[70vh] rounded-t-3xl !rounded-b-none border-0 p-0 m-0 animate-slide-in-from-bottom-full data-[state=closed]:animate-slide-out-to-bottom-full [&>button]:hidden">
+          <div className="flex flex-col w-full">
+            <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
+              <DialogTitle className="text-xl font-bold text-gray-800">
+                Delete {recordType === 'delivery' ? 'Delivery' : 'Pickup'} Record
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 p-6">
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete this {recordType} record? This action cannot be undone.
+              </p>
+              <div className="flex gap-4">
+                <Button
+                  onClick={() => setShowDeleteModal(false)}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    // TODO: Implement delete functionality
+                    setShowDeleteModal(false)
+                    // Refresh data after deletion
+                  }}
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dropdown Menu Modal */}
+      <Dialog open={showDropdownModal} onOpenChange={setShowDropdownModal}>
+        <DialogContent className="!fixed !inset-x-0 !bottom-0 !top-auto !left-0 !right-0 !transform-none !translate-x-0 !translate-y-0 mx-0 max-w-none !w-screen h-auto max-h-[50vh] rounded-t-3xl !rounded-b-none border-0 p-0 m-0 animate-slide-in-from-bottom-full data-[state=closed]:animate-slide-out-to-bottom-full [&>button]:hidden">
+          <div className="flex flex-col w-full">
+            <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
+              <DialogTitle className="text-xl font-bold text-gray-800">
+                {recordType === 'delivery' ? 'Delivery' : 'Pickup'} Options
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 p-6 space-y-4">
+              <Button
+                onClick={() => {
+                  setShowDropdownModal(false)
+                  if (recordType === 'delivery') {
+                    router.push(`/deliveries/edit/${selectedRecord?.id}`)
+                  } else {
+                    router.push(`/pickups/edit/${selectedRecord?.id}`)
+                  }
+                }}
+                variant="outline"
+                className="w-full h-16 justify-start text-left"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-800">Edit record</h3>
+                    <p className="text-sm text-gray-500">Modify this {recordType} record</p>
+                  </div>
+                </div>
+              </Button>
+
+              <Button
+                onClick={() => {
+                  setShowDropdownModal(false)
+                  setShowDeleteModal(true)
+                }}
+                variant="outline"
+                className="w-full h-16 justify-start text-left border-red-200 hover:border-red-300 hover:bg-red-50"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-red-600">Delete record</h3>
+                    <p className="text-sm text-red-500">Permanently remove this {recordType} record</p>
+                  </div>
+                </div>
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
