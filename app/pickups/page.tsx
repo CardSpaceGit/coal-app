@@ -952,6 +952,7 @@ export default function PickupsPage() {
                     <Weight className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
                       type="number"
+                      step="any"
                       value={container.weight}
                       onChange={(e) => {
                         const newWeight = e.target.value

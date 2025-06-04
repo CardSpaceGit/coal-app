@@ -398,13 +398,137 @@ export default function DashboardPage() {
   )
 
   const toggleContainer = (containerId: string) => {
-    const newExpanded = new Set(expandedContainers)
-    if (newExpanded.has(containerId)) {
-      newExpanded.delete(containerId)
-    } else {
-      newExpanded.add(containerId)
+    setExpandedContainers((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(containerId)) {
+        newSet.delete(containerId)
+      } else {
+        newSet.add(containerId)
+      }
+      return newSet
+    })
+  }
+
+  const handleDeleteRecord = async () => {
+    if (!selectedRecord || !user) return
+
+    setLoading(true)
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session) {
+        router.push("/login")
+        return
+      }
+
+      const { data: userData } = await supabase
+        .from("organization_users")
+        .select("user_id, organization_id")
+        .eq("user_id", session.user.id)
+        .eq("is_active", true)
+        .single()
+
+      if (!userData) {
+        console.error("User not found or inactive")
+        return
+      }
+
+      if (recordType === 'delivery') {
+        // First reverse the stock that was added by this delivery
+        const { error: stockError } = await supabase.rpc("update_stock_on_pickup", {
+          p_coal_yard_id: selectedRecord.coal_yard_id,
+          p_product_id: selectedRecord.product_id,
+          p_organization_id: (userData as any).organization_id,
+          p_weight_tons: selectedRecord.weight_tons,
+        })
+
+        if (stockError) {
+          console.error("Error reversing stock:", stockError)
+          throw new Error(`Failed to reverse stock: ${stockError.message}`)
+        }
+
+        // Then delete the delivery record
+        const { error: deleteError } = await supabase
+          .from("deliveries")
+          .delete()
+          .eq("id", selectedRecord.id)
+          .eq("organization_id", (userData as any).organization_id)
+
+        if (deleteError) {
+          console.error("Error deleting delivery:", deleteError)
+          throw new Error(`Failed to delete delivery: ${deleteError.message}`)
+        }
+
+        console.log("Delivery deleted successfully")
+      } else if (recordType === 'pickup') {
+        // For pickups, we need to add back the stock that was taken out
+        // Find all pickup records that should be deleted together (same session)
+        // This includes records with the same date, container number, and coal yard
+        const { data: relatedPickupRecords, error: fetchError } = await supabase
+          .from("pickup")
+          .select("*")
+          .eq("pickup_date", selectedRecord.pickup_date)
+          .eq("container_number", selectedRecord.container_number)
+          .eq("coal_yard_id", selectedRecord.coal_yard_id)
+          .eq("organization_id", (userData as any).organization_id)
+
+        if (fetchError) {
+          console.error("Error fetching related pickup records:", fetchError)
+          throw new Error(`Failed to fetch related pickup records: ${fetchError.message}`)
+        }
+
+        console.log(`Found ${relatedPickupRecords?.length || 0} related pickup records to delete`)
+
+        // Reverse stock for each product that was picked up
+        for (const record of relatedPickupRecords || []) {
+          const { error: stockError } = await supabase.rpc("update_stock_on_delivery", {
+            p_coal_yard_id: record.coal_yard_id,
+            p_product_id: record.product_id,
+            p_organization_id: (userData as any).organization_id,
+            p_weight_tons: record.weight_tons,
+          })
+
+          if (stockError) {
+            console.error("Error adding back stock:", stockError)
+            throw new Error(`Failed to add back stock for product ${record.product_id}: ${stockError.message}`)
+          }
+        }
+
+        // Then delete all related pickup records
+        const { error: deleteError } = await supabase
+          .from("pickup")
+          .delete()
+          .eq("pickup_date", selectedRecord.pickup_date)
+          .eq("container_number", selectedRecord.container_number)
+          .eq("coal_yard_id", selectedRecord.coal_yard_id)
+          .eq("organization_id", (userData as any).organization_id)
+
+        if (deleteError) {
+          console.error("Error deleting pickup records:", deleteError)
+          throw new Error(`Failed to delete pickup records: ${deleteError.message}`)
+        }
+
+        console.log("Pickup records deleted successfully")
+      }
+
+      // Close modal and refresh data
+      setShowDeleteModal(false)
+      setSelectedRecord(null)
+      
+      // Reload all dashboard data
+      await Promise.all([
+        loadDashboardData(),
+        loadDeliveryData(),
+        loadPickupData()
+      ])
+
+    } catch (error) {
+      console.error("Error deleting record:", error)
+      alert(`Error: ${(error as any)?.message || "Failed to delete record"}`)
+    } finally {
+      setLoading(false)
     }
-    setExpandedContainers(newExpanded)
   }
 
   return (
@@ -936,19 +1060,15 @@ export default function DashboardPage() {
                                     <p className="font-semibold text-gray-800 text-lg">
                                       Weighbridge Number {delivery.weighbridge_slip || delivery.id || "N/A"}
                                     </p>
-                                    <div className="flex items-center gap-4 text-gray-600 text-sm mt-1">
-                                      <div className="flex items-center gap-1">
-                                        <Weight className="h-4 w-4" />
-                                        <span>{delivery.weight_tons?.toLocaleString()}t</span>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <Package className="h-4 w-4" />
-                                        <span>1</span>
-                                      </div>
-                                    </div>
+                                    <p className="text-gray-600 text-sm mt-1">
+                                      {delivery.product?.name || "Mixed Products"}
+                                    </p>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-3">
+                                  <div className="text-right">
+                                    <p className="text-2xl font-bold text-gray-800">{delivery.weight_tons?.toLocaleString()}t</p>
+                                  </div>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation()
@@ -1089,19 +1209,15 @@ export default function DashboardPage() {
                                     <p className="font-semibold text-gray-800 text-lg">
                                       Container SARU | {pickup.container_number || pickup.weighbridge_slip || pickup.id || "N/A"}
                                     </p>
-                                    <div className="flex items-center gap-4 text-gray-600 text-sm mt-1">
-                                      <div className="flex items-center gap-1">
-                                        <Weight className="h-4 w-4" />
-                                        <span>{totalWeight?.toLocaleString()}t</span>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <Package className="h-4 w-4" />
-                                        <span>{containerCount}</span>
-                                      </div>
-                                    </div>
+                                    <p className="text-gray-600 text-sm mt-1">
+                                      {pickup.product?.name || "Mixed Products"}
+                                    </p>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-3">
+                                  <div className="text-right">
+                                    <p className="text-2xl font-bold text-gray-800">{totalWeight?.toLocaleString()}t</p>
+                                  </div>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation()
@@ -1414,14 +1530,11 @@ export default function DashboardPage() {
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => {
-                    // TODO: Implement delete functionality
-                    setShowDeleteModal(false)
-                    // Refresh data after deletion
-                  }}
+                  onClick={handleDeleteRecord}
+                  disabled={loading}
                   className="flex-1 bg-red-500 hover:bg-red-600 text-white"
                 >
-                  Delete
+                  {loading ? "Deleting..." : "Delete"}
                 </Button>
               </div>
             </div>

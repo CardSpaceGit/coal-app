@@ -33,6 +33,7 @@ export default function EditDeliveryPage() {
   const [coalYards, setCoalYards] = useState<CoalYard[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [deliveryData, setDeliveryData] = useState<DeliveryData | null>(null)
+  const [originalDeliveryData, setOriginalDeliveryData] = useState<DeliveryData | null>(null)
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [currentStock, setCurrentStock] = useState(0)
@@ -103,6 +104,7 @@ export default function EditDeliveryPage() {
       }
 
       setDeliveryData(delivery as any)
+      setOriginalDeliveryData(delivery as any)
 
       // Load products and yards in a single optimized query
       const [productsResult, allYardsResult] = await Promise.all([
@@ -234,7 +236,7 @@ export default function EditDeliveryPage() {
   }
 
   const handleUpdateDelivery = async () => {
-    if (!user || !deliveryData) return
+    if (!user || !deliveryData || !originalDeliveryData) return
 
     setLoading(true)
     try {
@@ -258,6 +260,84 @@ export default function EditDeliveryPage() {
         return
       }
 
+      // Calculate the differences for stock updates
+      const originalWeight = Number(originalDeliveryData.weight_tons)
+      const newWeight = typeof deliveryData.weight_tons === 'string' ? Number.parseFloat(deliveryData.weight_tons) : deliveryData.weight_tons
+      const weightDifference = newWeight - originalWeight
+      
+      const productChanged = originalDeliveryData.product_id !== deliveryData.product_id
+      const yardChanged = originalDeliveryData.coal_yard_id !== deliveryData.coal_yard_id
+
+      console.log("Stock update calculations:", {
+        originalWeight,
+        newWeight,
+        weightDifference,
+        productChanged,
+        yardChanged
+      })
+
+      // Handle stock updates if needed
+      if (weightDifference !== 0 || productChanged || yardChanged) {
+        
+        // If product or yard changed, we need to reverse the original delivery and add the new one
+        if (productChanged || yardChanged) {
+          // Reverse the original delivery (subtract from old product/yard)
+          const { error: reverseStockError } = await supabase.rpc("update_stock_on_pickup", {
+            p_coal_yard_id: originalDeliveryData.coal_yard_id,
+            p_product_id: originalDeliveryData.product_id,
+            p_organization_id: (userData as any).organization_id,
+            p_weight_tons: originalWeight,
+          })
+
+          if (reverseStockError) {
+            console.error("Error reversing original stock:", reverseStockError)
+            throw new Error(`Failed to reverse original stock: ${reverseStockError.message}`)
+          }
+
+          // Add the new delivery (add to new product/yard)
+          const { error: addStockError } = await supabase.rpc("update_stock_on_delivery", {
+            p_coal_yard_id: deliveryData.coal_yard_id,
+            p_product_id: deliveryData.product_id,
+            p_organization_id: (userData as any).organization_id,
+            p_weight_tons: newWeight,
+          })
+
+          if (addStockError) {
+            console.error("Error adding new stock:", addStockError)
+            throw new Error(`Failed to add new stock: ${addStockError.message}`)
+          }
+        } else {
+          // Same product and yard, just adjust the weight difference
+          if (weightDifference > 0) {
+            // Weight increased - add more stock
+            const { error: addStockError } = await supabase.rpc("update_stock_on_delivery", {
+              p_coal_yard_id: deliveryData.coal_yard_id,
+              p_product_id: deliveryData.product_id,
+              p_organization_id: (userData as any).organization_id,
+              p_weight_tons: weightDifference,
+            })
+
+            if (addStockError) {
+              console.error("Error adding additional stock:", addStockError)
+              throw new Error(`Failed to add additional stock: ${addStockError.message}`)
+            }
+          } else if (weightDifference < 0) {
+            // Weight decreased - remove stock
+            const { error: removeStockError } = await supabase.rpc("update_stock_on_pickup", {
+              p_coal_yard_id: deliveryData.coal_yard_id,
+              p_product_id: deliveryData.product_id,
+              p_organization_id: (userData as any).organization_id,
+              p_weight_tons: Math.abs(weightDifference),
+            })
+
+            if (removeStockError) {
+              console.error("Error removing excess stock:", removeStockError)
+              throw new Error(`Failed to remove excess stock: ${removeStockError.message}`)
+            }
+          }
+        }
+      }
+
       // Update delivery record
       const { error: deliveryError } = await supabase
         .from("deliveries")
@@ -266,7 +346,7 @@ export default function EditDeliveryPage() {
           product_id: deliveryData.product_id,
           delivery_date: deliveryData.delivery_date,
           weighbridge_slip: deliveryData.weighbridge_slip,
-          weight_tons: typeof deliveryData.weight_tons === 'string' ? Number.parseFloat(deliveryData.weight_tons) : deliveryData.weight_tons,
+          weight_tons: newWeight,
           notes: deliveryData.notes || null,
           updated_at: new Date().toISOString(),
         })
@@ -278,7 +358,7 @@ export default function EditDeliveryPage() {
         throw new Error(`Failed to update delivery: ${deliveryError.message}`)
       }
 
-      console.log("Delivery updated successfully")
+      console.log("Delivery updated successfully with stock adjustments")
       router.push("/dashboard")
     } catch (error) {
       console.error("Error updating delivery:", error)
@@ -417,6 +497,7 @@ export default function EditDeliveryPage() {
                   <Weight className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     type="number"
+                    step="any"
                     value={deliveryData.weight_tons}
                     onChange={(e) => updateDelivery("weight_tons", e.target.value)}
                     placeholder="2,000"
