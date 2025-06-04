@@ -174,28 +174,35 @@ export default function DashboardPage() {
     if (!user?.organization?.id) return
     
     try {
-      // Get coal yards that have stock for this organization
-      const { data: stockData } = await supabase
-        .from("stock")
-        .select("coal_yard_id")
-        .eq("organization_id", user.organization.id)
+      console.log("🔍 Dashboard: Loading coal yards for organization:", user.organization.id)
       
-      if (!stockData || stockData.length === 0) {
+      // Get organization details to access coal_yard_names
+      const { data: orgData } = await supabase
+        .from("organizations")
+        .select("coal_yard_names")
+        .eq("id", user.organization.id)
+        .single()
+
+      if (!orgData?.coal_yard_names) {
+        console.error("❌ Dashboard: Organization coal yard names not found")
         setCoalYards([])
         return
       }
 
-      const coalYardIds = [...new Set(stockData.map(s => s.coal_yard_id))]
-      
+      console.log("✅ Dashboard: Organization coal yard names:", orgData.coal_yard_names)
+
+      // Get yards for this organization based on coal_yard_names array
       const { data } = await supabase
         .from("coal_yards")
         .select("*")
-        .in("id", coalYardIds)
+        .in("name", orgData.coal_yard_names as string[])
         .order("name")
       
-      if (data) setCoalYards(data as CoalYard[])
+      console.log("✅ Dashboard: Loaded coal yards:", data)
+      
+      if (data) setCoalYards(data as unknown as CoalYard[])
     } catch (error) {
-      console.error("Error loading coal yards:", error)
+      console.error("❌ Dashboard: Error loading coal yards:", error)
     }
   }
 
@@ -244,7 +251,8 @@ export default function DashboardPage() {
       // Group data by coal yard
       const activityByYard: Record<string, { deliveries: any[]; pickups: any[] }> = {}
 
-      yards?.forEach((yard) => {
+      const yardsArray = yards as unknown as CoalYard[]
+      yardsArray?.forEach((yard) => {
         activityByYard[yard.id] = { deliveries: [], pickups: [] }
       })
 
@@ -351,7 +359,7 @@ export default function DashboardPage() {
         .select("*")
         .order("name")
 
-      if (products) setAllProducts(products as Product[])
+      if (products) setAllProducts(products as unknown as Product[])
     } catch (error) {
       console.error("Error loading all products:", error)
     }
