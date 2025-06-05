@@ -97,6 +97,32 @@ export default function DashboardPage() {
     }
   }, [authLoading, user, selectedYardFilter, dateRange])
 
+  // Generate real-time Grok analysis when ANY operational activity occurs
+  useEffect(() => {
+    if (deliveryData.length > 0 || pickupData.length > 0) {
+      generateGrokSummary()
+    }
+  }, [deliveryData, pickupData, stats, selectedYardFilter, dateRange])
+
+  // Also trigger when specific data points change (for real-time monitoring)
+  useEffect(() => {
+    const hasAnyActivity = deliveryData.length > 0 || pickupData.length > 0
+    const hasAnyEdits = [...deliveryData, ...pickupData].some(record => 
+      record.audit_logs && record.audit_logs.length > 0
+    )
+    
+    if (hasAnyActivity || hasAnyEdits) {
+      // Small delay to ensure all data is loaded
+      const timeoutId = setTimeout(generateGrokSummary, 500)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [
+    deliveryData.map(d => d.id).join(','), // Re-trigger if delivery IDs change
+    pickupData.map(p => p.id).join(','),   // Re-trigger if pickup IDs change
+    deliveryData.map(d => d.audit_logs?.length || 0).join(','), // Re-trigger if edits change
+    pickupData.map(p => p.audit_logs?.length || 0).join(',')    // Re-trigger if edits change
+  ])
+
   const loadDashboardData = async () => {
     if (!user?.organization?.id) return
 
@@ -449,12 +475,59 @@ export default function DashboardPage() {
 
   const generateGrokSummary = async () => {
     if (!deliveryData.length && !pickupData.length) {
-      setGrokSummary("No delivery or pickup data available for the selected date range.")
+      setGrokSummary("No operational activity detected. Monitoring for new deliveries, pickups, or record modifications...")
       return
     }
 
     setLoadingGrokSummary(true)
     try {
+      // Analyze audit logs for edits
+      const allAuditLogs = [
+        ...deliveryData.flatMap(d => d.audit_logs || []),
+        ...pickupData.flatMap(p => p.audit_logs || [])
+      ]
+
+      const editAnalysis = {
+        totalEdits: allAuditLogs.length,
+        editedRecords: {
+          deliveries: deliveryData.filter(d => d.audit_logs && d.audit_logs.length > 0).length,
+          pickups: pickupData.filter(p => p.audit_logs && p.audit_logs.length > 0).length
+        },
+        editors: allAuditLogs.reduce((acc, log) => {
+          const editor = log.user?.full_name || 'Unknown User'
+          if (!acc[editor]) acc[editor] = { count: 0, records: [] }
+          acc[editor].count += 1
+          acc[editor].records.push({
+            type: log.table_name,
+            recordId: log.record_id,
+            changes: Object.keys(log.new_values || {}).filter(field => 
+              field !== 'coal_yard_id' && log.old_values?.[field] !== log.new_values?.[field]
+            ),
+            date: log.created_at
+          })
+          return acc
+        }, {} as Record<string, { count: number; records: any[] }>),
+        recentEdits: allAuditLogs
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .slice(0, 5)
+          .map(log => ({
+            editor: log.user?.full_name || 'Unknown User',
+            type: log.table_name,
+            changes: Object.keys(log.new_values || {}).filter(field => 
+              field !== 'coal_yard_id' && log.old_values?.[field] !== log.new_values?.[field]
+            ),
+            date: new Date(log.created_at).toLocaleDateString()
+          })),
+        mostEditedFields: allAuditLogs.reduce((acc, log) => {
+          Object.keys(log.new_values || {}).forEach(field => {
+            if (field !== 'coal_yard_id' && log.old_values?.[field] !== log.new_values?.[field]) {
+              acc[field] = (acc[field] || 0) + 1
+            }
+          })
+          return acc
+        }, {} as Record<string, number>)
+      }
+
       // Prepare data for Grok analysis
       const summaryData = {
         dateRange: {
@@ -499,7 +572,8 @@ export default function DashboardPage() {
           }, {} as Record<string, { count: number; weight: number }>)
         },
         currentStock: stats?.totalStock || 0,
-        organization: user?.organization?.name || 'Coal Yard'
+        organization: user?.organization?.name || 'Coal Yard',
+        auditTrail: editAnalysis
       }
 
       // Call Grok API for analysis
@@ -509,7 +583,7 @@ export default function DashboardPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: `Analyze this coal yard operations data and provide a concise daily summary in 2-3 sentences. Focus on key insights, trends, and operational highlights.`,
+          prompt: `Analyze this real-time coal yard operations data and provide an immediate operational update in 3-4 sentences. Include: 1) Current activity status and any notable operational patterns, 2) ANY record edits or modifications - specifically identify WHO made changes and WHAT was edited, 3) Real-time data integrity alerts and recommendations. Focus on immediate actionable insights and flag any urgent patterns or issues requiring attention.`,
           data: summaryData
         })
       })
@@ -869,6 +943,48 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Grok AI Summary */}
+            <div className="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-xl border border-blue-100">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                                 <div>
+                   <h3 className="font-semibold text-gray-800">Live Operations Monitor</h3>
+                   <p className="text-xs text-gray-600">Real-time insights powered by Grok AI</p>
+                 </div>
+                <button
+                  onClick={generateGrokSummary}
+                  disabled={loadingGrokSummary}
+                  className="ml-auto p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-white/50 transition-colors"
+                                     title="Refresh analysis"
+                >
+                  <svg 
+                    className={`w-4 h-4 ${loadingGrokSummary ? 'animate-spin' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
+              <div className="text-sm text-gray-700 leading-relaxed">
+                {loadingGrokSummary ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                    <span className="text-gray-600">Analyzing live operations data...</span>
+                  </div>
+                ) : grokSummary ? (
+                  <p>{grokSummary}</p>
+                                 ) : (
+                   <p className="text-gray-500 italic">Monitoring for operational activity... Analysis will appear when deliveries, pickups, or edits are detected.</p>
+                 )}
+              </div>
+            </div>
+
             <div className="w-full">
               <div className="flex space-x-8 mb-6">
                 <button
@@ -1213,10 +1329,8 @@ export default function DashboardPage() {
                                       Weighbridge Number: {delivery.weighbridge_slip || delivery.id || "N/A"}
                                       {/* Edit indicator - will show when audit system is implemented */}
                                       {delivery.audit_logs && delivery.audit_logs.length > 0 && (
-                                        <span className="ml-2 inline-flex items-center">
-                                          <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.828-2.828z" />
-                                          </svg>
+                                        <span className="ml-2 inline-flex items-center bg-blue-100 px-2 py-1 rounded-full">
+                                          <span className="text-xs font-medium text-blue-600">Edited</span>
                                         </span>
                                       )}
                                     </p>
@@ -1436,10 +1550,8 @@ export default function DashboardPage() {
                                       Container SARU | {pickup.container_number || pickup.weighbridge_slip || pickup.id || "N/A"}
                                       {/* Edit indicator - will show when audit system is implemented */}
                                       {pickup.audit_logs && pickup.audit_logs.length > 0 && (
-                                        <span className="ml-2 inline-flex items-center">
-                                          <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.828-2.828z" />
-                                          </svg>
+                                        <span className="ml-2 inline-flex items-center bg-blue-100 px-2 py-1 rounded-full">
+                                          <span className="text-xs font-medium text-blue-600">Edited</span>
                                         </span>
                                       )}
                                     </p>

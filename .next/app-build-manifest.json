@@ -45,6 +45,11 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/pickups/edit/[id]/page.js"
+    ],
+    "/api/grok-summary/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/grok-summary/route.js"
     ]
   }
 }
