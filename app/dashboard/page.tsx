@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Menu, Plus, Truck, TrendingDown, Calendar, ChevronDown, Weight, Package } from "lucide-react"
+import { Menu, Plus, Truck, TrendingDown, ChevronDown } from "lucide-react"
+import { Calendar1, Weight, Box, Edit, DocumentDownload, DocumentText, Archive, Refresh, MoreSquare, Setting4, CloseSquare, Trash, ArrowRight } from "iconsax-reactjs"
 import { getSupabaseClient } from "@/lib/supabase"
 import { useAuth } from "@/hooks/useAuth"
 import type { Stock, Product, CoalYard } from "@/types/database"
@@ -864,9 +865,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="p-4 space-y-6 -mt-4 pb-24">
+      <div className="p-4 space-y-6 mt-2 pb-24">
         {/* Current Stock Gauge */}
-        <Card className="bg-white shadow-lg rounded-2xl">
+        <Card className="bg-white rounded-[32px]">
           <CardContent className="p-6">
             {/* Filter Controls */}
             <div className="flex items-center justify-between mb-6">
@@ -896,11 +897,7 @@ export default function DashboardPage() {
                 {/* Filter and Edit Buttons */}
                 <div className="flex items-center gap-2">
                   <Dialog open={showDateFilter} onOpenChange={setShowDateFilter}>
-                    <DialogTrigger asChild>
-                      <Button className="w-10 h-10 rounded-full bg-yellow-500 hover:bg-yellow-600 text-gray-800 flex items-center justify-center">
-                        <Calendar className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
+
                     <DialogContent className="!fixed !inset-x-0 !bottom-0 !top-auto !left-0 !right-0 !transform-none !translate-x-0 !translate-y-0 mx-0 max-w-none !w-screen h-auto max-h-[80vh] rounded-t-3xl !rounded-b-none border-0 p-0 m-0 animate-slide-in-from-bottom-full data-[state=closed]:animate-slide-out-to-bottom-full [&>button]:hidden">
                       <div className="flex flex-col w-full">
                         <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
@@ -912,21 +909,27 @@ export default function DashboardPage() {
                         <div className="flex-1 p-6 space-y-4 overflow-y-auto">
                           <div>
                             <Label className="text-sm font-medium">Start Date</Label>
-                            <Input
-                              type="date"
-                              value={dateRange.start}
-                              onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
-                              className="mt-1"
-                            />
+                            <div className="relative mt-1">
+                              <Input
+                                type="date"
+                                value={dateRange.start}
+                                onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
+                                className="pr-10"
+                              />
+                              <Calendar1 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            </div>
                           </div>
                           <div>
                             <Label className="text-sm font-medium">End Date</Label>
-                            <Input
-                              type="date"
-                              value={dateRange.end}
-                              onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
-                              className="mt-1"
-                            />
+                            <div className="relative mt-1">
+                              <Input
+                                type="date"
+                                value={dateRange.end}
+                                onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
+                                className="pr-10"
+                              />
+                              <Calendar1 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            </div>
                           </div>
                           <div className="flex justify-end gap-2">
                             <Button variant="outline" onClick={() => setShowDateFilter(false)}>
@@ -987,10 +990,10 @@ export default function DashboardPage() {
             </div>
 
             {/* Date Range Display with Export Button */}
-            <div className="flex items-center justify-between gap-4 text-gray-600 mb-6 bg-gray-50 p-3 rounded-lg">
+            <div className="flex items-center justify-between gap-4 text-gray-600 mb-6 bg-gray-50 p-3 rounded-[16px]">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
+                  <Calendar1 size={16} />
                   <span className="text-sm">
                     {new Date(dateRange.start).toLocaleDateString("en-US", {
                       weekday: "short",
@@ -1002,7 +1005,7 @@ export default function DashboardPage() {
                 </div>
                 <span className="text-gray-400">|</span>
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
+                  <Calendar1 size={16} />
                   <span className="text-sm">
                     {new Date(dateRange.end).toLocaleDateString("en-US", {
                       weekday: "short",
@@ -1014,8 +1017,19 @@ export default function DashboardPage() {
                 </div>
               </div>
               
+              {/* Edit Date Filter Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDateFilter(true)}
+                className="flex items-center gap-2 bg-white hover:bg-gray-50 border-gray-300 text-gray-600 hover:text-gray-800"
+              >
+                <Edit size={16} />
+                Edit
+              </Button>
+              
               {/* Export Button */}
-              <div className="relative" data-dropdown="export">
+              <div className="relative hidden" data-dropdown="export">
                 <Button
                   variant="outline"
                   size="sm"
@@ -1026,9 +1040,7 @@ export default function DashboardPage() {
                   {loadingExport ? (
                     <div className="w-4 h-4 animate-spin rounded-full border-b-2 border-gray-600"></div>
                   ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                    </svg>
+                    <DocumentDownload size={16} />
                   )}
                   {loadingExport ? 'Exporting...' : 'Export'}
                   <ChevronDown className="w-4 h-4" />
@@ -1041,27 +1053,21 @@ export default function DashboardPage() {
                         onClick={() => handleExport('csv')}
                         className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
+                        <DocumentText size={16} />
                         CSV
                       </button>
                       <button
                         onClick={() => handleExport('pdf')}
                         className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                        </svg>
+                        <DocumentText size={16} />
                         PDF
                       </button>
                       <button
                         onClick={() => handleExport('zip')}
                         className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
+                        <Archive size={16} />
                         ZIP
                       </button>
                     </div>
@@ -1071,12 +1077,16 @@ export default function DashboardPage() {
             </div>
 
             {/* Grok AI Summary */}
-            <div className="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-xl border border-blue-100">
+            <div className="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-[24px] border border-blue-100">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-[16px] flex items-center justify-center">
+                  <Image
+                    src="/images/grok.png"
+                    alt="Live Operations Monitor"
+                    width={20}
+                    height={20}
+                    className="w-10 h-10 rounded-[16px]"
+                  />
                 </div>
                                  <div>
                    <h3 className="font-semibold text-gray-800">Live Operations Monitor</h3>
@@ -1088,14 +1098,10 @@ export default function DashboardPage() {
                   className="ml-auto p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-white/50 transition-colors"
                                      title="Refresh analysis"
                 >
-                  <svg 
-                    className={`w-4 h-4 ${loadingGrokSummary ? 'animate-spin' : ''}`} 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
+                  <Refresh 
+                    size={16}
+                    className={loadingGrokSummary ? 'animate-spin' : ''}
+                  />
                 </button>
               </div>
               <div className="text-sm text-gray-700 leading-relaxed">
@@ -1433,7 +1439,7 @@ export default function DashboardPage() {
                     <div key={date}>
                       <div className="flex items-center gap-2 mb-4">
                         <div className="bg-gray-100 p-2 rounded-lg">
-                          <Calendar className="h-5 w-5 text-gray-700" />
+                          <Calendar1 size={20} className="text-gray-700" />
                         </div>
                         <h3 className="text-xl font-bold text-gray-800">{date}</h3>
                       </div>
@@ -1479,9 +1485,7 @@ export default function DashboardPage() {
                                     }}
                                     className="p-2 hover:bg-gray-100 rounded-lg"
                                   >
-                                    <svg className="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                                    </svg>
+                                    <MoreSquare size={20} className="text-gray-500" />
                                   </button>
                                   <ChevronDown
                                     className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
@@ -1541,9 +1545,7 @@ export default function DashboardPage() {
                                   {delivery.audit_logs && delivery.audit_logs.length > 0 && (
                                     <div className="mt-4 pt-4 border-t border-gray-200">
                                       <div className="flex items-center gap-2 mb-3">
-                                        <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.828-2.828z" />
-                                        </svg>
+                                        <Edit size={16} className="text-blue-500" />
                                         <span className="font-semibold text-gray-800 text-sm">Edit History</span>
                                       </div>
                                       <div className="space-y-3 max-h-48 overflow-y-auto">
@@ -1651,7 +1653,7 @@ export default function DashboardPage() {
                     <div key={date}>
                       <div className="flex items-center gap-2 mb-4">
                         <div className="bg-gray-100 p-2 rounded-lg">
-                          <Calendar className="h-5 w-5 text-gray-700" />
+                          <Calendar1 size={20} className="text-gray-700" />
                         </div>
                         <h3 className="text-xl font-bold text-gray-800">{date}</h3>
                       </div>
@@ -1700,9 +1702,7 @@ export default function DashboardPage() {
                                     }}
                                     className="p-2 hover:bg-gray-100 rounded-lg"
                                   >
-                                    <svg className="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                                    </svg>
+                                    <MoreSquare size={20} className="text-gray-500" />
                                   </button>
                                   <ChevronDown
                                     className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
@@ -1787,9 +1787,7 @@ export default function DashboardPage() {
                                   {pickup.audit_logs && pickup.audit_logs.length > 0 && (
                                     <div className="mt-4 pt-4 border-t border-gray-200">
                                       <div className="flex items-center gap-2 mb-3">
-                                        <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.828-2.828z" />
-                                        </svg>
+                                        <Edit size={16} className="text-blue-500" />
                                         <span className="font-semibold text-gray-800 text-sm">Edit History</span>
                                       </div>
                                       <div className="space-y-3 max-h-48 overflow-y-auto">
@@ -1996,9 +1994,7 @@ export default function DashboardPage() {
                   className="flex items-center justify-between w-full text-white text-xl font-light py-4 border-b border-white/20"
                 >
                   <span>Log Out</span>
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  <ArrowRight size={24} />
                 </button>
 
                 {/* Footer */}
@@ -2112,9 +2108,7 @@ export default function DashboardPage() {
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
+                    <Edit size={24} className="text-gray-600" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-800">Edit record</h3>
@@ -2133,9 +2127,7 @@ export default function DashboardPage() {
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
+                    <Trash size={24} className="text-red-600" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-red-600">Delete record</h3>

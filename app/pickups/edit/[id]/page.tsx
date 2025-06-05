@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ArrowLeft, Plus, Trash2, Calendar, Weight, FileText, Users, X } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, Users, X } from "lucide-react"
+import { Calendar1, Weight, DocumentText } from "iconsax-reactjs"
 import { getSupabaseClient } from "@/lib/supabase"
 import { useAuth } from "@/hooks/useAuth"
 import type { CoalYard, Product } from "@/types/database"
@@ -654,7 +655,7 @@ export default function EditPickupPage() {
           </Button>
           <h1 className="text-lg font-semibold">Edit Pickup</h1>
           <Button variant="ghost" onClick={() => setShowStockModal(true)}>
-            <FileText className="h-14 w-14" />
+            <DocumentText size={56} />
           </Button>
         </div>
       </div>
@@ -718,26 +719,26 @@ export default function EditPickupPage() {
               <div>
                 <Label className="text-sm text-gray-600">Pickup Date</Label>
                 <div className="relative mt-1">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     type="date"
                     value={pickupDate}
                     onChange={(e) => setPickupDate(e.target.value)}
-                    className="pl-10 rounded-full border-gray-300"
+                    className="pr-10 rounded-full border-gray-300"
                   />
+                  <Calendar1 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
               </div>
 
               <div>
                 <Label className="text-sm text-gray-600">Weighbridge Slip (Optional)</Label>
                 <div className="relative mt-1">
-                  <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     value={weighbridgeSlip}
                     onChange={(e) => setWeighbridgeSlip(e.target.value)}
                     placeholder="G67-3748-2930"
-                    className="pl-10 rounded-full border-gray-300"
+                    className="pr-10 rounded-full border-gray-300"
                   />
+                  <DocumentText size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
               </div>
 
@@ -777,8 +778,7 @@ export default function EditPickupPage() {
                 <div>
                   <Label className="text-sm text-gray-600">Container Number</Label>
                   <div className="relative mt-1">
-                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <span className="absolute left-10 top-1/2 -translate-y-1/2 text-gray-500">SARU</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">SARU</span>
                     <Input
                       value={container.containerNumber}
                       onChange={(e) => handleContainerNumberChange(container.id, e.target.value)}
@@ -805,8 +805,9 @@ export default function EditPickupPage() {
                         }, 200)
                       }}
                       placeholder="2685504"
-                      className="pl-20 rounded-full border-gray-300"
+                      className="pl-16 pr-10 rounded-full border-gray-300"
                     />
+                    <Users className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
 
                     {/* Suggestions Dropdown */}
                     {showSuggestions[container.id] && filteredSuggestions[container.id]?.length > 0 && (
@@ -909,16 +910,18 @@ export default function EditPickupPage() {
                           <div>
                             <Label className="text-sm text-gray-600">Weight for this product</Label>
                             <div className="relative mt-1">
-                              <Weight className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                               <Input
                                 type="number"
                                 step="any"
                                 value={product.weight}
                                 onChange={(e) => updateProductInContainer(container.id, product.id, "weight", e.target.value)}
                                 placeholder="1,000"
-                                className="pl-10 rounded-full border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                className="pr-16 rounded-full border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
-                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">t</span>
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                <Weight className="h-4 w-4 text-gray-400" />
+                                <span className="text-sm text-gray-500">t</span>
+                              </div>
                             </div>
                           </div>
                         </div>

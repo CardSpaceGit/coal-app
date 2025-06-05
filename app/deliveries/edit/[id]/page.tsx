@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ArrowLeft, Calendar, Weight, FileText, X } from "lucide-react"
+import { ArrowLeft, X } from "lucide-react"
+import { Calendar1, Weight, DocumentText } from "iconsax-reactjs"
 import { getSupabaseClient } from "@/lib/supabase"
 import { useAuth } from "@/hooks/useAuth"
 import type { CoalYard, Product } from "@/types/database"
@@ -477,7 +478,7 @@ export default function EditDeliveryPage() {
           </Button>
           <h1 className="text-lg font-semibold">Edit Delivery</h1>
           <Button variant="ghost" onClick={() => setShowStockModal(true)}>
-            <FileText className="h-14 w-14" />
+            <DocumentText size={56} />
           </Button>
         </div>
       </div>
@@ -543,42 +544,44 @@ export default function EditDeliveryPage() {
               <div>
                 <Label className="text-sm text-gray-600">Delivery Date</Label>
                 <div className="relative mt-1">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     type="date"
                     value={deliveryData.delivery_date}
                     onChange={(e) => updateDelivery("delivery_date", e.target.value)}
-                    className="pl-10 rounded-full border-gray-300"
+                    className="pr-10 rounded-full border-gray-300"
                   />
+                  <Calendar1 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
               </div>
 
               <div>
                 <Label className="text-sm text-gray-600">Weighbridge Slip</Label>
                 <div className="relative mt-1">
-                  <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     value={deliveryData.weighbridge_slip}
                     onChange={(e) => updateDelivery("weighbridge_slip", e.target.value)}
                     placeholder="G67-3748-2930"
-                    className="pl-10 rounded-full border-gray-300"
+                    className="pr-10 rounded-full border-gray-300"
                   />
+                  <DocumentText size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
               </div>
 
               <div>
                 <Label className="text-sm text-gray-600">Weight</Label>
                 <div className="relative mt-1">
-                  <Weight className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     type="number"
                     step="any"
                     value={deliveryData.weight_tons}
                     onChange={(e) => updateDelivery("weight_tons", e.target.value)}
                     placeholder="2,000"
-                    className="pl-10 rounded-full border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="pr-16 rounded-full border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">t</span>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <Weight className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm text-gray-500">t</span>
+                  </div>
                 </div>
               </div>
 

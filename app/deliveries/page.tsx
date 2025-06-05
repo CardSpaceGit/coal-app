@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ArrowLeft, Plus, Trash2, Calendar, Weight, FileText, X } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, X } from "lucide-react"
+import { Calendar1, Weight, DocumentText } from "iconsax-reactjs"
 import { getSupabaseClient } from "@/lib/supabase"
 import { useAuth } from "@/hooks/useAuth"
 import type { CoalYard, Product } from "@/types/database"
@@ -403,7 +404,7 @@ export default function DeliveriesPage() {
           </Button>
           <h1 className="text-lg font-semibold">Add Deliveries</h1>
           <Button variant="ghost" onClick={() => setShowStockModal(true)}>
-            <FileText className="h-14 w-14" />
+            <DocumentText size={56} />
           </Button>
         </div>
       </div>
@@ -480,42 +481,44 @@ export default function DeliveriesPage() {
                 <div>
                   <Label className="text-sm text-gray-600">Delivery Date</Label>
                   <div className="relative mt-1">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
                       type="date"
                       value={delivery.deliveryDate}
                       onChange={(e) => updateDelivery(delivery.id, "deliveryDate", e.target.value)}
-                      className="pl-10 rounded-full border-gray-300"
+                      className="pr-10 rounded-full border-gray-300"
                     />
+                    <Calendar1 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   </div>
                 </div>
 
                 <div>
                   <Label className="text-sm text-gray-600">Weighbridge Slip</Label>
                   <div className="relative mt-1">
-                    <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
                       value={delivery.weighbridgeSlip}
                       onChange={(e) => updateDelivery(delivery.id, "weighbridgeSlip", e.target.value)}
                       placeholder="G67-3748-2930"
-                      className="pl-10 rounded-full border-gray-300"
+                      className="pr-10 rounded-full border-gray-300"
                     />
+                    <DocumentText size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   </div>
                 </div>
 
                 <div>
                   <Label className="text-sm text-gray-600">Weight</Label>
                   <div className="relative mt-1">
-                    <Weight className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input
                       type="text"
                       inputMode="decimal"
                       value={delivery.weight}
                       onChange={(e) => updateDelivery(delivery.id, "weight", e.target.value)}
                       placeholder="2,000"
-                      className="flex h-10 w-full rounded-full border border-gray-300 bg-background px-3 py-2 pl-10 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-full border border-gray-300 bg-background px-3 py-2 pr-16 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">t</span>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      <Weight className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm text-gray-500">t</span>
+                    </div>
                   </div>
                 </div>
 

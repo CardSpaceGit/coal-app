@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ArrowLeft, Plus, Trash2, Calendar, Package, Weight, FileText, X } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, X } from "lucide-react"
+import { Calendar1, Box, Weight, DocumentText, TickSquare } from "iconsax-reactjs"
 import { getSupabaseClient } from "@/lib/supabase"
 import type { CoalYard, Product } from "@/types/database"
 import Image from "next/image"
@@ -692,7 +693,7 @@ export default function PickupsPage() {
           </Button>
           <h1 className="text-lg font-semibold">Add Pickups</h1>
           <Button variant="ghost" onClick={() => setShowStockModal(true)}>
-            <FileText className="h-14 w-14" />
+            <DocumentText size={56} />
           </Button>
         </div>
       </div>
@@ -760,26 +761,26 @@ export default function PickupsPage() {
               <div>
                 <Label className="text-sm text-gray-600">Pick Up Date</Label>
                 <div className="relative mt-1">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     type="date"
                     value={pickupDate}
                     onChange={(e) => setPickupDate(e.target.value)}
-                    className="pl-10 rounded-full border-gray-300"
+                    className="pr-10 rounded-full border-gray-300"
                   />
+                                      <Calendar1 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
               </div>
 
               <div>
                 <Label className="text-sm text-gray-600">Weighbridge Slip</Label>
                 <div className="relative mt-1">
-                  <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     value={weighbridgeSlip}
                     onChange={(e) => setWeighbridgeSlip(e.target.value)}
                     placeholder="xxx-xxx-xxxx"
-                    className="pl-10 rounded-full border-gray-300"
+                    className="pr-10 rounded-full border-gray-300"
                   />
+                                      <DocumentText size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
               </div>
             </div>
@@ -808,8 +809,7 @@ export default function PickupsPage() {
                 <div>
                   <Label className="text-sm text-gray-600">Container Number</Label>
                   <div className="relative">
-                    <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <div className="absolute left-12 top-1/2 -translate-y-1/2 text-gray-500 font-medium pointer-events-none">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium pointer-events-none">
                       SARU
                     </div>
                     <Input
@@ -850,8 +850,9 @@ export default function PickupsPage() {
                         }, 200)
                       }}
                       placeholder="2685504"
-                      className="pl-20 rounded-full border-gray-300"
+                      className="pl-16 pr-10 rounded-full border-gray-300"
                     />
+                    <Box size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
 
                     {/* Suggestions Dropdown */}
                     {showSuggestions[container.id] && filteredSuggestions[container.id]?.length > 0 && (
@@ -907,13 +908,7 @@ export default function PickupsPage() {
                               }`}
                             >
                               {isSelected && stockAmount > 0 && (
-                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                  <path
-                                    fillRule="evenodd"
-                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                    clipRule="evenodd"
-                                  />
-                                </svg>
+                                <TickSquare size={16} className="text-white" />
                               )}
                             </div>
 
@@ -949,16 +944,18 @@ export default function PickupsPage() {
                   <Label className="text-sm text-gray-600">Enter container/product weight</Label>
                   <p className="text-xs text-gray-500 mb-2">This is the total product weight in the container.</p>
                   <div className="relative">
-                    <Weight className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input
                       type="text"
                       inputMode="decimal"
                       value={container.weight}
                       onChange={(e) => updateContainer(container.id, "weight", e.target.value)}
                       placeholder="2,000"
-                      className="flex h-10 w-full rounded-full border border-gray-300 bg-background px-3 py-2 pl-10 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-full border border-gray-300 bg-background px-3 py-2 pr-16 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">t</span>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      <Weight className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm text-gray-500">t</span>
+                    </div>
                   </div>
                   <div className="mt-1 flex justify-between text-xs">
                     <span className="text-gray-500">

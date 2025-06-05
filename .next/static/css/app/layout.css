@@ -809,12 +809,6 @@ video {
 .left-1\/2 {
   left: 50%;
 }
-.left-10 {
-  left: 2.5rem;
-}
-.left-12 {
-  left: 3rem;
-}
 .left-2 {
   left: 0.5rem;
 }
@@ -1547,8 +1541,20 @@ video {
 .rounded-2xl {
   border-radius: 1rem;
 }
+.rounded-\[16px\] {
+  border-radius: 16px;
+}
+.rounded-\[24px\] {
+  border-radius: 24px;
+}
 .rounded-\[2px\] {
   border-radius: 2px;
+}
+.rounded-\[32px\] {
+  border-radius: 32px;
+}
+.rounded-\[40px\] {
+  border-radius: 40px;
 }
 .rounded-\[inherit\] {
   border-radius: inherit;
@@ -1974,11 +1980,11 @@ video {
 .pl-10 {
   padding-left: 2.5rem;
 }
+.pl-16 {
+  padding-left: 4rem;
+}
 .pl-2\.5 {
   padding-left: 0.625rem;
-}
-.pl-20 {
-  padding-left: 5rem;
 }
 .pl-4 {
   padding-left: 1rem;
@@ -1986,8 +1992,14 @@ video {
 .pl-8 {
   padding-left: 2rem;
 }
+.pr-10 {
+  padding-right: 2.5rem;
+}
 .pr-12 {
   padding-right: 3rem;
+}
+.pr-16 {
+  padding-right: 4rem;
 }
 .pr-2 {
   padding-right: 0.5rem;
@@ -2705,6 +2717,11 @@ video {
 .hover\:text-gray-700:hover {
   --tw-text-opacity: 1;
   color: rgb(55 65 81 / var(--tw-text-opacity, 1));
+}
+
+.hover\:text-gray-800:hover {
+  --tw-text-opacity: 1;
+  color: rgb(31 41 55 / var(--tw-text-opacity, 1));
 }
 
 .hover\:text-green-700:hover {
