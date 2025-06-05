@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Menu, Plus, Truck, TrendingDown, ChevronDown } from "lucide-react"
+import { Menu, Plus, ChevronDown } from "lucide-react"
 import { Calendar1, Weight, Box, Edit, DocumentDownload, DocumentText, Archive, Refresh, MoreSquare, Setting4, CloseSquare, Trash, ArrowRight } from "iconsax-reactjs"
 import { getSupabaseClient } from "@/lib/supabase"
 import { useAuth } from "@/hooks/useAuth"
@@ -1465,7 +1465,13 @@ export default function DashboardPage() {
                                 >
                                 <div className="flex items-center gap-4">
                                   <div className="bg-gray-800 p-3 rounded-2xl">
-                                    <Truck className="h-6 w-6 text-white" />
+                                    <Image
+                                      src="/delivery.jpg"
+                                      alt="Delivery"
+                                      width={24}
+                                      height={24}
+                                      className="w-8 h-8 object-cover rounded-[24px]"
+                                    />
                                   </div>
                                   <div>
                                     <p className="font-semibold text-gray-800 text-md">
@@ -1508,15 +1514,15 @@ export default function DashboardPage() {
                                   <p className="font-semibold text-gray-800 mb-4">Products:</p>
                                   
                                   <div className="space-y-3">
-                                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl">
                                       <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
+                                        <div className="w-16 h-16 rounded-[24px] flex items-center justify-center">
                                           <Image
                                             src={delivery.product?.image_url || "/placeholder.svg?height=48&width=48&text=Coal"}
                                             alt={delivery.product?.name || "Product"}
                                             width={48}
                                             height={48}
-                                            className="w-10 h-10 object-cover rounded"
+                                            className="w-16 h-16 object-cover rounded-[24px]"
                                           />
                                         </div>
                                         <div>
@@ -1525,7 +1531,7 @@ export default function DashboardPage() {
                                         </div>
                                       </div>
                                       <div className="text-right">
-                                        <p className="text-xl font-bold text-gray-800">{delivery.weight_tons?.toLocaleString()} t</p>
+                                        <p className="text-md font-bold text-gray-800">{delivery.weight_tons?.toLocaleString()} t</p>
                                       </div>
                                     </div>
                                   </div>
@@ -1558,9 +1564,9 @@ export default function DashboardPage() {
                                         <Edit size={16} className="text-blue-500" />
                                         <span className="font-semibold text-gray-800 text-sm">Edit History</span>
                                       </div>
-                                      <div className="space-y-3 max-h-48 overflow-y-auto">
+                                      <div className="space-y-3 max-h-80 overflow-y-auto">
                                         {delivery.audit_logs.map((audit: any, index: number) => (
-                                          <div key={audit.id} className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                                          <div key={audit.id} className="bg-blue-50 rounded-[20px] p-3 border border-blue-100">
                                             <div className="flex items-center justify-between mb-2">
                                               <span className="text-xs font-medium text-blue-700 uppercase tracking-wide">
                                                 {audit.action || 'EDIT'}
@@ -1682,7 +1688,13 @@ export default function DashboardPage() {
                               >
                                 <div className="flex items-center gap-4">
                                   <div className="bg-gray-800 p-3 rounded-lg">
-                                    <TrendingDown className="h-6 w-6 text-white" />
+                                    <Image
+                                      src="/pickups.jpg"
+                                      alt="Pickup"
+                                      width={24}
+                                      height={24}
+                                      className="w-6 h-6 object-cover rounded"
+                                    />
                                   </div>
                                   <div>
                                     <p className="font-semibold text-gray-800 text-lg">
@@ -1727,9 +1739,9 @@ export default function DashboardPage() {
                                   <div className="space-y-3">
                                     {pickup.pickup_containers?.map((container: any, index: number) => 
                                       container.pickup_container_products?.map((containerProduct: any, productIndex: number) => (
-                                        <div key={`${container.id}-${productIndex}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                                        <div key={`${container.id}-${productIndex}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-[24px]">
                                           <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
+                                            <div className="w-12 h-12 bg-gray-800 rounded-2xl flex items-center justify-center">
                                               <Image
                                                 src={containerProduct.product?.image_url || "/placeholder.svg?height=48&width=48&text=Coal"}
                                                 alt={containerProduct.product?.name || "Product"}
@@ -1744,7 +1756,7 @@ export default function DashboardPage() {
                                             </div>
                                           </div>
                                           <div className="text-right">
-                                            <p className="text-xl font-bold text-gray-800">{containerProduct.weight_tons?.toLocaleString()} t</p>
+                                            <p className="text-lg font-bold text-gray-800">{containerProduct.weight_tons?.toLocaleString()} t</p>
                                           </div>
                                         </div>
                                       ))
@@ -1916,7 +1928,13 @@ export default function DashboardPage() {
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
-                    <Truck className="h-6 w-6 text-white" />
+                    <Image
+                      src="/delivery.jpg"
+                      alt="Delivery"
+                      width={24}
+                      height={24}
+                      className="w-6 h-6 object-cover rounded"
+                    />
                   </div>
                   <div className="text-left">
                     <h3 className="font-semibold text-gray-800 text-lg">Add deliveries</h3>
@@ -1935,7 +1953,13 @@ export default function DashboardPage() {
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
-                    <TrendingDown className="h-6 w-6 text-white" />
+                    <Image
+                      src="/pickups.jpg"
+                      alt="Pickup"
+                      width={24}
+                      height={24}
+                      className="w-6 h-6 object-cover rounded"
+                    />
                   </div>
                   <div className="text-left">
                     <h3 className="font-semibold text-gray-800 text-lg">Add pickups</h3>
