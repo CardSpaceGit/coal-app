@@ -61,6 +61,7 @@ export default function DashboardPage() {
   const [showSideMenu, setShowSideMenu] = useState(false)
   const [grokSummary, setGrokSummary] = useState<string>("")
   const [loadingGrokSummary, setLoadingGrokSummary] = useState(false)
+  const [loadingExport, setLoadingExport] = useState(false)
 
   // Add this near the top of the component, after the existing useEffect
   // useEffect(() => {
@@ -122,6 +123,21 @@ export default function DashboardPage() {
     deliveryData.map(d => d.audit_logs?.length || 0).join(','), // Re-trigger if edits change
     pickupData.map(p => p.audit_logs?.length || 0).join(',')    // Re-trigger if edits change
   ])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (!target.closest('[data-dropdown="export"]')) {
+        setOpenDropdown(null)
+      }
+    }
+
+    if (openDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [openDropdown])
 
   const loadDashboardData = async () => {
     if (!user?.organization?.id) return
@@ -746,6 +762,60 @@ export default function DashboardPage() {
     }
   }
 
+  const handleExport = async (format: 'csv' | 'pdf' | 'zip') => {
+    if (!user?.id || !user?.organization?.id) return
+
+    try {
+      setLoadingExport(true)
+      setOpenDropdown(null)
+
+      // Get the auth session
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      const response = await fetch('/api/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': session?.access_token ? `Bearer ${session.access_token}` : '',
+        },
+        body: JSON.stringify({
+          format,
+          userId: user.id,
+          organizationId: user.organization.id,
+          dateRange,
+          coalYardFilter: selectedYardFilter
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Export failed')
+      }
+
+      // Get the filename from the response header
+      const contentDisposition = response.headers.get('content-disposition')
+      const filename = contentDisposition
+        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
+        : `export-${format}-${new Date().toISOString().split('T')[0]}.${format}`
+
+      // Create blob and download
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.style.display = 'none'
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Export error:', error)
+      // You could add a toast notification here
+    } finally {
+      setLoadingExport(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -916,30 +986,87 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Date Range Display */}
-            <div className="flex items-center gap-4 text-gray-600 mb-6 bg-gray-50 p-3 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span className="text-sm">
-                  {new Date(dateRange.start).toLocaleDateString("en-US", {
-                    weekday: "short",
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </span>
+            {/* Date Range Display with Export Button */}
+            <div className="flex items-center justify-between gap-4 text-gray-600 mb-6 bg-gray-50 p-3 rounded-lg">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span className="text-sm">
+                    {new Date(dateRange.start).toLocaleDateString("en-US", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+                <span className="text-gray-400">|</span>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span className="text-sm">
+                    {new Date(dateRange.end).toLocaleDateString("en-US", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
               </div>
-              <span className="text-gray-400">|</span>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span className="text-sm">
-                  {new Date(dateRange.end).toLocaleDateString("en-US", {
-                    weekday: "short",
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </span>
+              
+              {/* Export Button */}
+              <div className="relative" data-dropdown="export">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loadingExport}
+                  onClick={() => setOpenDropdown(openDropdown === 'export' ? null : 'export')}
+                  className="flex items-center gap-2 bg-white hover:bg-gray-50 border-gray-300"
+                >
+                  {loadingExport ? (
+                    <div className="w-4 h-4 animate-spin rounded-full border-b-2 border-gray-600"></div>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                    </svg>
+                  )}
+                  {loadingExport ? 'Exporting...' : 'Export'}
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
+                
+                {openDropdown === 'export' && !loadingExport && (
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                    <div className="p-2">
+                      <button
+                        onClick={() => handleExport('csv')}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        CSV
+                      </button>
+                      <button
+                        onClick={() => handleExport('pdf')}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        PDF
+                      </button>
+                      <button
+                        onClick={() => handleExport('zip')}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        ZIP
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1252,7 +1379,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Deliveries and Pickups List */}
+        {/* Deliveries and Pickups Tables */}
         <Card className="bg-white shadow-lg rounded-2xl">
           <CardContent className="p-6">
             <div className="flex space-x-8 mb-6">
