@@ -1765,15 +1765,15 @@ export default function DashboardPage() {
                                         <div className="flex items-center gap-4">
                                           <div className="w-16 h-16 rounded-[24px] flex items-center justify-center">
                                             <Image
-                                              src="/placeholder.svg?height=48&width=48&text=Coal"
-                                              alt="Product"
+                                              src={pickup.product?.image_url || "/placeholder.svg?height=48&width=48&text=Coal"}
+                                              alt={pickup.product?.name || "Product"}
                                               width={48}
                                               height={48}
                                               className="w-16 h-16 object-cover rounded-[24px]"
                                             />
                                           </div>
                                           <div>
-                                            <p className="font-semibold text-gray-800">Mixed Products</p>
+                                            <p className="font-semibold text-gray-800">{pickup.product?.name}</p>
                                             <p className="text-sm text-gray-500">Stockpile 1</p>
                                           </div>
                                         </div>
@@ -1785,10 +1785,6 @@ export default function DashboardPage() {
                                   </div>
 
                                   <div className="mt-4 pt-4 border-t border-gray-200 space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                      <span className="text-gray-600">Picked up by:</span>
-                                      <span className="font-medium">{pickup.created_by || 'N/A'}</span>
-                                    </div>
                                     <div className="flex justify-between">
                                       <span className="text-gray-600">Coal Yard:</span>
                                       <span className="font-medium">{pickup.coal_yard?.name}</span>
@@ -1896,16 +1892,16 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Floating Action Button */}
-      <div className="fixed bottom-6 right-6">
-        <Button
-          size="lg"
-          className="h-14 w-14 rounded-full bg-yellow-500 hover:bg-yellow-600 text-gray-800 shadow-lg"
-          onClick={() => setShowAddModal(true)}
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
-      </div>
+              {/* Floating Action Button */}
+        <div className="fixed bottom-12 right-12">
+          <Button
+            size="lg"
+            className="h-20 w-20 rounded-full bg-yellow-500 hover:bg-yellow-600 text-gray-800 shadow-lg"
+            onClick={() => setShowAddModal(true)}
+          >
+            <Plus className="!h-8 !w-8" style={{ width: '32px', height: '32px' }} />
+          </Button>
+        </div>
 
       {/* Add Modal */}
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
@@ -1917,27 +1913,27 @@ export default function DashboardPage() {
                 Choose whether to record new deliveries coming in or pickups going out
               </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 p-6 space-y-4 overflow-y-auto">
+            <div className="flex-1 p-4 space-y-4 overflow-y-auto">
               <Button
                 variant="outline"
-                className="w-full h-20 justify-start border-2 border-gray-200 hover:border-yellow-500 hover:bg-yellow-50"
+                className="w-full h-20 justify-start border-2 border-gray-200 hover:border-yellow-500 hover:bg-yellow-50 rounded-[40px]"
                 onClick={() => {
                   setShowAddModal(false)
                   router.push("/deliveries")
                 }}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
+                  <div className="rounded-2xl flex items-center justify-center">
                     <Image
                       src="/delivery.jpg"
                       alt="Delivery"
                       width={24}
                       height={24}
-                      className="w-6 h-6 object-cover rounded"
+                      className="w-12 h-12 object-cover rounded"
                     />
                   </div>
                   <div className="text-left">
-                    <h3 className="font-semibold text-gray-800 text-lg">Add deliveries</h3>
+                    <h3 className="font-semibold text-gray-800 text-lg">Add Deliveries</h3>
                     <p className="text-sm text-gray-500">Load coming in to the yard</p>
                   </div>
                 </div>
@@ -1945,20 +1941,20 @@ export default function DashboardPage() {
 
               <Button
                 variant="outline"
-                className="w-full h-20 justify-start border-2 border-gray-200 hover:border-yellow-500 hover:bg-yellow-50"
+                className="w-full h-20 justify-start border-2 border-gray-200 hover:border-yellow-500 hover:bg-yellow-50 rounded-[40px]"
                 onClick={() => {
                   setShowAddModal(false)
                   router.push("/pickups")
                 }}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
+                  <div className="rounded-lg flex items-center justify-center">
                     <Image
                       src="/pickups.jpg"
                       alt="Pickup"
                       width={24}
                       height={24}
-                      className="w-6 h-6 object-cover rounded"
+                      className="w-12 h-12 object-cover rounded"
                     />
                   </div>
                   <div className="text-left">
