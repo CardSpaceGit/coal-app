@@ -1,6 +1,7 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
-  "/api/grok-summary/route": "app/api/grok-summary/route.js",
+  "/deliveries/edit/[id]/page": "app/deliveries/edit/[id]/page.js",
   "/login/page": "app/login/page.js",
-  "/dashboard/page": "app/dashboard/page.js"
+  "/deliveries/page": "app/deliveries/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/page": "app/page.js"
 }

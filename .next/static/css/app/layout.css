@@ -3767,6 +3767,10 @@ video {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
+  .md\:grid-cols-none {
+    grid-template-columns: none;
+  }
+
   .md\:text-5xl {
     font-size: 3rem;
     line-height: 1;

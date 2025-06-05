@@ -107,9 +107,26 @@ export default function EditDeliveryPage() {
       setDeliveryData(delivery as any)
       setOriginalDeliveryData(delivery as any)
 
+      // Get organization details to access product_names
+      const { data: orgData2 } = await supabase
+        .from("organizations")
+        .select("product_names")
+        .eq("id", (userData as any).organization_id)
+        .single()
+
+      if (!orgData2?.product_names) {
+        console.error("❌ Edit Delivery: Organization product names not found")
+        return
+      }
+
       // Load products and yards in a single optimized query
       const [productsResult, allYardsResult] = await Promise.all([
-        supabase.from("products").select("*").order("name"),
+        // Get products for this organization based on product_names array
+        supabase
+          .from("products")
+          .select("*")
+          .in("name", orgData2.product_names as string[])
+          .order("name"),
         
         // Get yards for this organization based on coal_yard_names array
         supabase

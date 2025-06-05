@@ -1186,7 +1186,7 @@ export default function DashboardPage() {
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
                         <p className="text-md text-gray-600 mb-2">Total available stock</p>
-                        <p className="text-5xl font-bold text-gray-800">{stats?.totalStock.toLocaleString() || 0} t</p>
+                        <p className="text-4xl font-bold text-gray-800">{stats?.totalStock.toLocaleString() || 0} t</p>
                       </div>
                     </div>
                   </div>
@@ -1212,10 +1212,26 @@ export default function DashboardPage() {
                   {/* Product Stock Chart */}
                                     <div className="space-y-4">
                     <div className="flex justify-center">
-                      <div className={`grid gap-24 my-12 justify-center items-center max-w-6xl mx-auto`} style={{ gridTemplateColumns: `repeat(${Math.min(Object.keys(productStockByType).length, 6)}, minmax(0, 1fr))` }}>
+                      <div 
+                        className="grid grid-cols-2 md:grid-cols-none gap-24 my-12 justify-center items-center max-w-6xl mx-auto"
+                        style={{ 
+                          '--mobile-cols': '2',
+                          '--desktop-cols': Math.min(Object.keys(productStockByType).length, 6),
+                          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))'
+                        } as React.CSSProperties & { '--mobile-cols': string, '--desktop-cols': number }}
+                      >
+                        <style jsx>{`
+                          @media (min-width: 768px) {
+                            div {
+                              grid-template-columns: repeat(var(--desktop-cols), minmax(0, 1fr)) !important;
+                            }
+                          }
+                        `}</style>
                         {Object.entries(productStockByType).map(([productName, { weight, product }]) => {
-                          const maxWeight = Math.max(...Object.values(productStockByType).map(p => p.weight))
-                          const percentage = maxWeight > 0 ? (weight / maxWeight) * 100 : 0
+                          const maxWeight = 80000
+                          const rawPercentage = maxWeight > 0 ? (weight / maxWeight) * 100 : 0
+                          // Set minimum visible height of 8% if there's any stock, otherwise 0%
+                          const percentage = weight > 0 ? Math.max(rawPercentage, 8) : 0
                           const stockpileNumber = allProducts.findIndex(p => p.name === productName) + 1
 
                           return (
@@ -1224,7 +1240,7 @@ export default function DashboardPage() {
                               <div className="text-lg font-bold text-gray-800 mb-2">{weight.toLocaleString()} t</div>
 
                               {/* Vertical Bar */}
-                              <div className="w-16 h-32 bg-gray-200 rounded-[24px] flex items-end mb-3">
+                              <div className="w-16 h-48 bg-gray-200 rounded-[24px] flex items-end mb-3">
                                 <div
                                   className="w-full bg-gray-800 rounded-[24px] transition-all duration-300"
                                   style={{ height: `${percentage}%` }}
