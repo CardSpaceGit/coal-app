@@ -650,27 +650,27 @@ export default function EditPickupPage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 p-4">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-5 w-5" />
+          <Button variant="ghost" className="rounded-full" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="h-6 w-6" />
           </Button>
-          <h1 className="text-lg font-semibold">Edit Pickup</h1>
-          <Button variant="ghost" onClick={() => setShowStockModal(true)}>
+          <h1 className="text-2xl font-bold">Edit Pickup</h1>
+          <Button variant="ghost" className="rounded-full" onClick={() => setShowStockModal(true)}>
             <DocumentText size={56} />
           </Button>
         </div>
       </div>
 
-      <div className="p-4 space-y-6 pb-24">
+      <div className="p-4 space-y-6 pb-48 rounded-[24px]">
         {/* Pickup Details Card */}
-        <Card>
+        <Card className="rounded-[32px]">
           <CardContent className="p-4">
-            <h3 className="font-semibold mb-4">Pickup details</h3>
+            <h3 className="font-semibold text-lg mb-0">Pickup details</h3>
 
             <div className="space-y-4">
               {/* Yard Selection */}
               <div>
-                <Label className="text-sm text-gray-600 mb-3 block">Select the yard</Label>
-                <div className="grid grid-cols-2 gap-3">
+                <Label className="text-md text-gray-600 mb-3 block">Select the yard</Label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {coalYards.map((yard) => (
                     <button
                       key={yard.id}
@@ -678,8 +678,8 @@ export default function EditPickupPage() {
                         setSelectedYard(yard.id)
                         loadCurrentStock(yard.id)
                       }}
-                      className={`relative rounded-lg border-2 p-3 transition-all ${
-                        selectedYard === yard.id ? "border-green-500 bg-green-50" : "border-gray-200 bg-white"
+                      className={`relative rounded-[32px] border-2 p-3 transition-all ${
+                        selectedYard === yard.id ? "border-yellow-500 bg-yellow-50" : "border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300"
                       }`}
                     >
                       {selectedYard === yard.id && (
@@ -692,9 +692,9 @@ export default function EditPickupPage() {
                         alt={yard.name}
                         width={120}
                         height={80}
-                        className="w-full h-16 object-cover rounded mb-2"
+                        className="w-full h-48 object-cover rounded-[24px] mb-2"
                       />
-                      <p className="font-semibold text-sm">{yard.code}</p>
+                      <p className="font-semibold text-md">{yard.code}</p>
                       
                       {/* Stock Information */}
                       <div className="mt-2 text-xs text-gray-600">
@@ -724,6 +724,10 @@ export default function EditPickupPage() {
                     value={pickupDate}
                     onChange={(e) => setPickupDate(e.target.value)}
                     className="pr-10 rounded-full border-gray-300"
+                    style={{
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'textfield'
+                    }}
                   />
                   <Calendar1 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
@@ -748,7 +752,7 @@ export default function EditPickupPage() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add Any Additional Notes (Optional)"
-                  className="mt-1 rounded-lg border-gray-300 resize-none"
+                  className="mt-1 rounded-[16px] border-gray-300 resize-none"
                   rows={3}
                 />
               </div>
@@ -758,10 +762,10 @@ export default function EditPickupPage() {
 
         {/* Container Entries */}
         {containers.map((container, containerIndex) => (
-          <Card key={container.id}>
+          <Card key={container.id} className="rounded-[32px]">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Container {containerIndex + 1}</h3>
+              <div className="flex items-center justify-between mb-0">
+                <h3 className="font-semibold text-lg">Container {containerIndex + 1}</h3>
                 {containers.length > 1 && (
                   <Button
                     variant="ghost"
@@ -855,7 +859,7 @@ export default function EditPickupPage() {
 
                         <div className="space-y-4">
                           <div>
-                            <Label className="text-sm text-gray-600 mb-3 block">Product Type</Label>
+                            <Label className="text-lg font-semibold text-gray-800 mt-8 block">Product Type</Label>
                             <div className="space-y-3">
                               {products.map((productOption, index) => {
                                 const stockAmount = productStock[productOption.id] || 0
@@ -864,28 +868,28 @@ export default function EditPickupPage() {
                                   <div
                                     key={productOption.id}
                                     onClick={() => updateProductInContainer(container.id, product.id, "productId", productOption.id)}
-                                    className={`flex items-center justify-between p-4 border-2 rounded-xl transition-all cursor-pointer ${
+                                    className={`flex items-center justify-between p-4 border-2 rounded-[24px] transition-all cursor-pointer ${
                                       product.productId === productOption.id
-                                        ? "border-green-500 bg-green-50"
-                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                                                                  ? "border-yellow-500 bg-yellow-50"
+                                        : "border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300"
                                     }`}
                                   >
                                     <div className="flex items-center gap-4">
                                       <div
                                         className={`w-6 h-6 border-2 rounded-full flex items-center justify-center ${
-                                          product.productId === productOption.id ? "border-green-500 bg-green-500" : "border-gray-300"
+                                          product.productId === productOption.id ? "border-yellow-500 bg-yellow-500" : "border-gray-300"
                                         }`}
                                       >
                                         {product.productId === productOption.id && <div className="w-3 h-3 bg-white rounded-full" />}
                                       </div>
 
-                                      <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
+                                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center">
                                         <Image
                                           src={productOption.image_url || "/placeholder.svg?height=48&width=48&text=Coal"}
                                           alt={productOption.name}
                                           width={48}
                                           height={48}
-                                          className="w-10 h-10 object-cover rounded"
+                                          className="w-16 h-16 object-cover rounded"
                                         />
                                       </div>
 
@@ -920,7 +924,7 @@ export default function EditPickupPage() {
                               />
                               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
                                 <Weight className="h-4 w-4 text-gray-400" />
-                                <span className="text-sm text-gray-500">t</span>
+                                <span className="text-md text-gray-500">t</span>
                               </div>
                             </div>
                           </div>
@@ -978,7 +982,7 @@ export default function EditPickupPage() {
             
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-6">
                 {allStockData.map((productData, index) => {
                   const maxStock = Math.max(...allStockData.map(p => p.totalStock))
                   const percentage = maxStock > 0 ? (productData.totalStock / maxStock) * 100 : 0

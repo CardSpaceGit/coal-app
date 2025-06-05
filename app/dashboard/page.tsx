@@ -478,13 +478,65 @@ export default function DashboardPage() {
   }
 
   const loadAllProducts = async () => {
+    if (!user?.organization?.id) return
+    
     try {
-      const { data: products } = await supabase
-        .from("products")
-        .select("*")
-        .order("name")
+      console.log("🔍 Dashboard: Loading products for organization:", user.organization.id)
+      
+      // Get products that have EVER had stock for this organization OR have been used in deliveries/pickups
+      const [stockProducts, deliveryProducts, pickupProducts] = await Promise.all([
+        // All products that have ever had stock records (including current zero stock)
+        supabase
+          .from("stock")
+          .select("product:products(*)")
+          .eq("organization_id", user.organization.id),
+        
+        // Products used in deliveries
+        supabase
+          .from("deliveries")
+          .select("product:products(*)")
+          .eq("organization_id", user.organization.id),
+          
+        // Products used in pickups
+        supabase
+          .from("pickup")
+          .select("product:products(*)")
+          .eq("organization_id", user.organization.id)
+      ])
 
-      if (products) setAllProducts(products as unknown as Product[])
+      console.log("🔍 Dashboard: Stock products result:", stockProducts.data?.length || 0)
+      console.log("🔍 Dashboard: Delivery products result:", deliveryProducts.data?.length || 0)
+      console.log("🔍 Dashboard: Pickup products result:", pickupProducts.data?.length || 0)
+
+      // Combine all products and remove duplicates
+      const allRelevantProducts = new Map()
+      
+      stockProducts.data?.forEach((item: any) => {
+        if (item.product) {
+          console.log("📦 Adding stock product:", item.product.name)
+          allRelevantProducts.set(item.product.id, item.product)
+        }
+      })
+      
+      deliveryProducts.data?.forEach((item: any) => {
+        if (item.product) {
+          console.log("🚚 Adding delivery product:", item.product.name)
+          allRelevantProducts.set(item.product.id, item.product)
+        }
+      })
+      
+      pickupProducts.data?.forEach((item: any) => {
+        if (item.product) {
+          console.log("📤 Adding pickup product:", item.product.name)
+          allRelevantProducts.set(item.product.id, item.product)
+        }
+      })
+
+      const uniqueProducts = Array.from(allRelevantProducts.values())
+        .sort((a: any, b: any) => a.name.localeCompare(b.name))
+
+      console.log("✅ Dashboard: Final unique products:", uniqueProducts.map((p: any) => p.name))
+      setAllProducts(uniqueProducts as unknown as Product[])
     } catch (error) {
       console.error("Error loading all products:", error)
     }
@@ -1458,7 +1510,7 @@ export default function DashboardPage() {
                         {deliveries.map((delivery: any) => {
                           const isExpanded = expandedContainers.has(delivery.id)
                                                       return (
-                              <div key={delivery.id} className={`bg-white rounded-[24px] p-4 border ${isExpanded ? 'border-gray-600' : 'border-gray-100'}`}>
+                              <div key={delivery.id} className={`bg-white rounded-[24px] p-4 border transition-all ${isExpanded ? 'border-gray-600' : 'border-gray-100 hover:bg-gray-50 hover:border-gray-300'}`}>
                                 <div
                                   className="flex items-center justify-between cursor-pointer"
                                   onClick={() => toggleContainer(delivery.id)}
@@ -1681,7 +1733,7 @@ export default function DashboardPage() {
                           const containerCount = pickup.pickup_containers?.length || 1
 
                           return (
-                            <div key={pickup.id} className={`bg-white rounded-[24px] p-4 border ${isExpanded ? 'border-gray-600' : 'border-gray-100'}`}>
+                            <div key={pickup.id} className={`bg-white rounded-[24px] p-4 border transition-all ${isExpanded ? 'border-gray-600' : 'border-gray-100 hover:bg-gray-50 hover:border-gray-300'}`}>
                               <div
                                 className="flex items-center justify-between cursor-pointer"
                                 onClick={() => toggleContainer(pickup.id)}
