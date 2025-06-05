@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ArrowLeft, Plus, Trash2, Calendar, Weight, FileText, Users, X } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
 import { useAuth } from "@/hooks/useAuth"
@@ -51,6 +51,7 @@ export default function EditPickupPage() {
   const [weighbridgeSlip, setWeighbridgeSlip] = useState("")
   const [notes, setNotes] = useState("")
   const [containers, setContainers] = useState<ContainerEntry[]>([])
+  const [originalContainers, setOriginalContainers] = useState<ContainerEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [currentStock, setCurrentStock] = useState(0)
@@ -58,8 +59,47 @@ export default function EditPickupPage() {
   const [showStockModal, setShowStockModal] = useState(false)
   const [allStockData, setAllStockData] = useState<Array<{productName: string, totalStock: number, yards: Array<{yardName: string, yardCode: string, stock: number}>}>>([])
   const [productStock, setProductStock] = useState<Record<string, number>>({})
+  const [showSuggestions, setShowSuggestions] = useState<Record<string, boolean>>({})
+  const [filteredSuggestions, setFilteredSuggestions] = useState<Record<string, string[]>>({})
+  
+  const containerNumbers = [
+    "2685504", "2685582", "2687693", "2687796", "2688220", "2693818", "2688853", "2628263", "1685417", "2678773",
+    "2686450", "2699950", "2679846", "2697726", "2682794", "2681458", "2697963", "2685474", "2678480", "2628176",
+    "2680153", "2694218", "2692262", "2693309", "2697074", "2698640", "2677798", "2695066", "2685556", "2699272",
+    "2692787", "2628411", "2684523", "2684930", "2699570", "2680301", "2686547", "2688863", "2695699", "2685788",
+    "2696519", "2697264", "2677890", "2691409", "2685670", "2681102", "1689541", "1612093", "1686305", "2694603"
+  ]
   
   const supabase = getSupabaseClient()
+
+  // Audit logging function
+  const logAuditTrail = async (action: string, oldValues: any, newValues: any, organizationId: string, newPickupIds: string[]) => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      
+      if (!session) return
+
+      // Log audit trail for each new pickup record
+      for (const recordId of newPickupIds) {
+        await supabase
+          .from("audit_logs")
+          .insert({
+            table_name: "pickup",
+            record_id: recordId,
+            action: action,
+            old_values: oldValues,
+            new_values: newValues,
+            changed_by: session.user.id,
+            organization_id: organizationId
+          })
+      }
+    } catch (error) {
+      console.error("Error logging audit trail:", error)
+      // Don't throw error - audit logging shouldn't break the main operation
+    }
+  }
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -154,7 +194,9 @@ export default function EditPickupPage() {
         })
       })
 
-      setContainers(Array.from(containerMap.values()))
+      const containersArray = Array.from(containerMap.values())
+      setContainers(containersArray)
+      setOriginalContainers(JSON.parse(JSON.stringify(containersArray))) // Deep copy for comparison
 
       // Load products and yards
       const [productsResult, allYardsResult] = await Promise.all([
@@ -171,12 +213,18 @@ export default function EditPickupPage() {
       if (productsResult.data) setProducts(productsResult.data as any)
       
       if (allYardsResult.data && allYardsResult.data.length > 0) {
-        setCoalYards(allYardsResult.data as any)
+        const yards = allYardsResult.data as any
+        const products = productsResult.data as any
+        setCoalYards(yards)
         
         // Load current stock for the pickup's yard
-        if (pickupRecords.length > 0) {
-          loadCurrentStock((pickupRecords[0] as any).coal_yard_id)
+        const pickupYardId = firstRecord.coal_yard_id
+        if (pickupYardId) {
+          loadCurrentStock(pickupYardId)
         }
+        
+        // Load stock data for all yards efficiently (needed for yard cards display)
+        loadAllYardStockOptimized(yards, products, (userData as any).organization_id)
       }
 
       await loadAllStockData((userData as any).organization_id)
@@ -240,6 +288,47 @@ export default function EditPickupPage() {
       }
     } catch (error) {
       console.error("Error loading current stock:", error)
+    }
+  }
+
+  const loadAllYardStockOptimized = async (yards: CoalYard[], products: Product[], organizationId: string) => {
+    try {
+      // Get all stock data for this organization in a single query
+      const { data: allStockData } = await supabase
+        .from("stock")
+        .select(`
+          coal_yard_id,
+          product_id,
+          current_weight_tons
+        `)
+        .eq("organization_id", organizationId)
+
+      const stockData: Record<string, Array<{productName: string, stock: number}>> = {}
+
+      // Initialize all yards
+      yards.forEach((yard) => {
+        stockData[yard.id] = []
+      })
+
+      // Group stock data by yard
+      allStockData?.forEach((stock: any) => {
+        const product = products.find(p => p.id === stock.product_id)
+        if (product && stockData[stock.coal_yard_id]) {
+          stockData[stock.coal_yard_id].push({
+            productName: product.name,
+            stock: Number(stock.current_weight_tons)
+          })
+        }
+      })
+
+      // Sort products within each yard
+      Object.keys(stockData).forEach(yardId => {
+        stockData[yardId].sort((a, b) => a.productName.localeCompare(b.productName))
+      })
+
+      setYardStockData(stockData)
+    } catch (error) {
+      console.error("Error loading yard stock data:", error)
     }
   }
 
@@ -336,6 +425,45 @@ export default function EditPickupPage() {
     )
   }
 
+  const handleContainerNumberChange = (containerId: string, value: string) => {
+    // Remove any non-numeric characters and any "SARU" prefix if accidentally typed
+    const numericValue = value.replace(/[^\d]/g, "")
+
+    updateContainer(containerId, "containerNumber", numericValue)
+
+    if (numericValue.length > 0) {
+      // Filter suggestions based on the numeric part
+      const filtered = containerNumbers.filter((num) => num.includes(numericValue)).slice(0, 5)
+
+      setFilteredSuggestions((prev) => ({
+        ...prev,
+        [containerId]: filtered,
+      }))
+      setShowSuggestions((prev) => ({
+        ...prev,
+        [containerId]: filtered.length > 0,
+      }))
+    } else {
+      // Show first 5 options when input is empty
+      setFilteredSuggestions((prev) => ({
+        ...prev,
+        [containerId]: containerNumbers.slice(0, 5),
+      }))
+      setShowSuggestions((prev) => ({
+        ...prev,
+        [containerId]: true,
+      }))
+    }
+  }
+
+  const selectContainerNumber = (containerId: string, number: string) => {
+    updateContainer(containerId, "containerNumber", number)
+    setShowSuggestions((prev) => ({
+      ...prev,
+      [containerId]: false,
+    }))
+  }
+
   const handleUpdatePickup = async () => {
     if (!user || pickupRecords.length === 0) return
 
@@ -361,7 +489,22 @@ export default function EditPickupPage() {
         return
       }
 
-      // Delete all existing pickup records for this pickup
+      // First, reverse the stock changes from the original pickup records
+      for (const record of pickupRecords) {
+        const { error: reverseStockError } = await supabase.rpc("update_stock_on_delivery", {
+          p_coal_yard_id: record.coal_yard_id,
+          p_product_id: record.product_id,
+          p_organization_id: userData.organization_id,
+          p_weight_tons: record.weight_tons,
+        })
+
+        if (reverseStockError) {
+          console.error("Error reversing original pickup stock:", reverseStockError)
+          throw new Error(`Failed to reverse original pickup stock: ${reverseStockError.message}`)
+        }
+      }
+
+      // Then delete all existing pickup records for this pickup
       const pickupRecordIds = pickupRecords.map(r => r.id)
       const { error: deleteError } = await supabase
         .from("pickup")
@@ -374,11 +517,12 @@ export default function EditPickupPage() {
       }
 
       // Create new pickup records for each container-product combination
+      const newPickupIds: string[] = []
       for (const container of containers) {
         if (container.containerNumber && container.products.some(p => p.productId && p.weight)) {
           for (const product of container.products) {
             if (product.productId && product.weight) {
-              const { error: insertError } = await supabase
+              const { data: insertedData, error: insertError } = await supabase
                 .from("pickup")
                 .insert({
                   user_id: userData.user_id,
@@ -391,10 +535,16 @@ export default function EditPickupPage() {
                   weight_tons: Number.parseFloat(product.weight),
                   notes: notes || null,
                 })
+                .select('id')
+                .single()
 
               if (insertError) {
                 console.error("Error inserting pickup record:", insertError)
                 throw new Error(`Failed to save pickup record: ${insertError.message}`)
+              }
+
+              if (insertedData && (insertedData as any).id) {
+                newPickupIds.push((insertedData as any).id)
               }
 
               // Update stock using RPC function
@@ -413,6 +563,52 @@ export default function EditPickupPage() {
           }
         }
       }
+
+      // Create detailed audit trail comparing original vs new data
+      const originalData: any = {
+        pickup_date: pickupRecords[0]?.pickup_date || pickupDate,
+        weighbridge_slip: pickupRecords[0]?.weighbridge_slip || weighbridgeSlip,
+        notes: pickupRecords[0]?.notes || notes,
+        coal_yard_id: pickupRecords[0]?.coal_yard_id || selectedYard,
+      }
+
+      const newData: any = {
+        pickup_date: pickupDate,
+        weighbridge_slip: weighbridgeSlip,
+        notes: notes,
+        coal_yard_id: selectedYard,
+      }
+
+      // Add detailed container and product information
+      originalContainers.forEach((container, containerIndex) => {
+        container.products.forEach((product, productIndex) => {
+          const key = `container_${containerIndex + 1}_product_${productIndex + 1}`
+          
+          // Find the product name
+          const productInfo = products.find(p => p.id === product.productId)
+          const productName = productInfo?.name || 'Unknown Product'
+          
+          originalData[`${key}_container_number`] = container.containerNumber
+          originalData[`${key}_product`] = productName
+          originalData[`${key}_weight_tons`] = product.weight
+        })
+      })
+
+      containers.forEach((container, containerIndex) => {
+        container.products.forEach((product, productIndex) => {
+          const key = `container_${containerIndex + 1}_product_${productIndex + 1}`
+          
+          // Find the product name
+          const productInfo = products.find(p => p.id === product.productId)
+          const productName = productInfo?.name || 'Unknown Product'
+          
+          newData[`${key}_container_number`] = container.containerNumber
+          newData[`${key}_product`] = productName
+          newData[`${key}_weight_tons`] = product.weight
+        })
+      })
+
+      await logAuditTrail("UPDATE", originalData, newData, userData.organization_id as string, newPickupIds)
 
       console.log("Pickup updated successfully")
       router.push("/dashboard")
@@ -582,12 +778,55 @@ export default function EditPickupPage() {
                   <Label className="text-sm text-gray-600">Container Number</Label>
                   <div className="relative mt-1">
                     <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <span className="absolute left-10 top-1/2 -translate-y-1/2 text-gray-500">SARU</span>
                     <Input
                       value={container.containerNumber}
-                      onChange={(e) => updateContainer(container.id, "containerNumber", e.target.value)}
-                      placeholder="SARU | 2685504"
-                      className="pl-10 rounded-full border-gray-300"
+                      onChange={(e) => handleContainerNumberChange(container.id, e.target.value)}
+                      onFocus={() => {
+                        // Show suggestions when focusing on empty input
+                        if (!container.containerNumber) {
+                          setFilteredSuggestions((prev) => ({
+                            ...prev,
+                            [container.id]: containerNumbers.slice(0, 5),
+                          }))
+                          setShowSuggestions((prev) => ({
+                            ...prev,
+                            [container.id]: true,
+                          }))
+                        }
+                      }}
+                      onBlur={() => {
+                        // Hide suggestions after a short delay to allow selection
+                        setTimeout(() => {
+                          setShowSuggestions((prev) => ({
+                            ...prev,
+                            [container.id]: false,
+                          }))
+                        }, 200)
+                      }}
+                      placeholder="2685504"
+                      className="pl-20 rounded-full border-gray-300"
                     />
+
+                    {/* Suggestions Dropdown */}
+                    {showSuggestions[container.id] && filteredSuggestions[container.id]?.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {filteredSuggestions[container.id].map((suggestion, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            className="w-full px-4 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none first:rounded-t-lg last:rounded-b-lg"
+                            onMouseDown={(e) => {
+                              e.preventDefault() // Prevent input blur
+                              selectContainerNumber(container.id, suggestion)
+                            }}
+                          >
+                            <span className="text-gray-500">SARU</span>
+                            <span className="font-medium">{suggestion}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -685,31 +924,12 @@ export default function EditPickupPage() {
                         </div>
                       </div>
                     ))}
-
-                    <Button
-                      onClick={() => addProductToContainer(container.id)}
-                      variant="outline"
-                      className="w-full h-10 rounded-full border-2 border-yellow-500 text-yellow-600 hover:bg-yellow-50"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      ADD ANOTHER PRODUCT
-                    </Button>
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
         ))}
-
-        {/* Add Another Container Button */}
-        <Button
-          onClick={addContainer}
-          variant="outline"
-          className="w-full h-12 rounded-full border-2 border-yellow-500 text-yellow-600 hover:bg-yellow-50"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          ADD ANOTHER CONTAINER
-        </Button>
       </div>
 
       {/* Bottom Section */}
@@ -743,7 +963,9 @@ export default function EditPickupPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <DialogTitle className="text-2xl font-bold text-gray-800">Total available stock</DialogTitle>
-                  <p className="text-gray-600 mt-1">Details of all outgoing coal shipments.</p>
+                  <DialogDescription className="text-gray-600 mt-1">
+                    Details of all outgoing coal shipments.
+                  </DialogDescription>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => setShowStockModal(false)}>
                   <X className="h-6 w-6" />

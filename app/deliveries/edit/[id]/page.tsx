@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ArrowLeft, Calendar, Weight, FileText, X } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
 import { useAuth } from "@/hooks/useAuth"
@@ -121,8 +121,13 @@ export default function EditDeliveryPage() {
       if (productsResult.data) setProducts(productsResult.data as unknown as Product[])
       
       if (allYardsResult.data && allYardsResult.data.length > 0) {
-        setCoalYards(allYardsResult.data as unknown as CoalYard[])
+        const yards = allYardsResult.data as unknown as CoalYard[]
+        const products = productsResult.data as unknown as Product[]
+        setCoalYards(yards)
         loadCurrentStock((delivery as any).coal_yard_id as string)
+        
+        // Load stock data for all yards efficiently (needed for yard cards display)
+        loadAllYardStockOptimized(yards, products, (userData as any).organization_id)
       }
 
       await loadAllStockData((userData as any).organization_id as string)
@@ -186,6 +191,47 @@ export default function EditDeliveryPage() {
       }
     } catch (error) {
       console.error("Error loading current stock:", error)
+    }
+  }
+
+  const loadAllYardStockOptimized = async (yards: CoalYard[], products: Product[], organizationId: string) => {
+    try {
+      // Get all stock data for this organization in a single query
+      const { data: allStockData } = await supabase
+        .from("stock")
+        .select(`
+          coal_yard_id,
+          product_id,
+          current_weight_tons
+        `)
+        .eq("organization_id", organizationId)
+
+      const stockData: Record<string, Array<{productName: string, stock: number}>> = {}
+
+      // Initialize all yards
+      yards.forEach((yard) => {
+        stockData[yard.id] = []
+      })
+
+      // Group stock data by yard
+      allStockData?.forEach((stock: any) => {
+        const product = products.find(p => p.id === stock.product_id)
+        if (product && stockData[stock.coal_yard_id]) {
+          stockData[stock.coal_yard_id].push({
+            productName: product.name,
+            stock: Number(stock.current_weight_tons)
+          })
+        }
+      })
+
+      // Sort products within each yard
+      Object.keys(stockData).forEach(yardId => {
+        stockData[yardId].sort((a, b) => a.productName.localeCompare(b.productName))
+      })
+
+      setYardStockData(stockData)
+    } catch (error) {
+      console.error("Error loading yard stock data:", error)
     }
   }
 
@@ -358,6 +404,9 @@ export default function EditDeliveryPage() {
         throw new Error(`Failed to update delivery: ${deliveryError.message}`)
       }
 
+      // Log audit trail before navigating away
+      await logAuditTrail("UPDATE", originalDeliveryData, deliveryData, (userData as any).organization_id)
+
       console.log("Delivery updated successfully with stock adjustments")
       router.push("/dashboard")
     } catch (error) {
@@ -365,6 +414,32 @@ export default function EditDeliveryPage() {
       alert(`Error: ${(error as any)?.message || "Failed to update delivery"}`)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Audit logging function
+  const logAuditTrail = async (action: string, oldValues: any, newValues: any, organizationId: string) => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      
+      if (!session) return
+
+      await supabase
+        .from("audit_logs")
+        .insert({
+          table_name: "deliveries",
+          record_id: deliveryId,
+          action: action,
+          old_values: oldValues,
+          new_values: newValues,
+          changed_by: session.user.id,
+          organization_id: organizationId
+        })
+    } catch (error) {
+      console.error("Error logging audit trail:", error)
+      // Don't throw error - audit logging shouldn't break the main operation
     }
   }
 
@@ -604,7 +679,9 @@ export default function EditDeliveryPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <DialogTitle className="text-2xl font-bold text-gray-800">Total available stock</DialogTitle>
-                  <p className="text-gray-600 mt-1">Details of all outgoing coal shipments.</p>
+                  <DialogDescription className="text-gray-600 mt-1">
+                    Details of all outgoing coal shipments.
+                  </DialogDescription>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => setShowStockModal(false)}>
                   <X className="h-6 w-6" />

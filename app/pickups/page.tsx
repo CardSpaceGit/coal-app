@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ArrowLeft, Plus, Trash2, Calendar, Package, Weight, FileText, X } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
 import type { CoalYard, Product } from "@/types/database"
@@ -1063,7 +1063,9 @@ export default function PickupsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <DialogTitle className="text-2xl font-bold text-gray-800">Total available stock</DialogTitle>
-                  <p className="text-gray-600 mt-1">Details of all outgoing coal shipments.</p>
+                  <DialogDescription className="text-gray-600 mt-1">
+                    Details of all outgoing coal shipments.
+                  </DialogDescription>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => setShowStockModal(false)}>
                   <X className="h-6 w-6" />

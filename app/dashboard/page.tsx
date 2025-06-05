@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth"
 import type { Stock, Product, CoalYard } from "@/types/database"
 import Image from "next/image"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 // Remove this import since we're not using Tabs components anymore
@@ -59,6 +59,8 @@ export default function DashboardPage() {
   const router = useRouter()
   const supabase = getSupabaseClient()
   const [showSideMenu, setShowSideMenu] = useState(false)
+  const [grokSummary, setGrokSummary] = useState<string>("")
+  const [loadingGrokSummary, setLoadingGrokSummary] = useState(false)
 
   // Add this near the top of the component, after the existing useEffect
   // useEffect(() => {
@@ -303,9 +305,51 @@ export default function DashboardPage() {
         return
       }
 
-      console.log("Delivery data loaded:", deliveries?.length || 0, "records")
-      console.log("First delivery sample:", deliveries?.[0])
-      if (deliveries) setDeliveryData(deliveries)
+      // Fetch audit logs separately
+      if (deliveries && deliveries.length > 0) {
+        const deliveryIds = deliveries.map((d: any) => d.id)
+        console.log("🔍 Fetching audit logs for delivery IDs:", deliveryIds)
+        
+        const { data: auditLogs, error: auditError } = await supabase
+          .from("audit_logs")
+          .select("*")
+          .eq("table_name", "deliveries")
+          .in("record_id", deliveryIds)
+          .order("created_at", { ascending: false })
+
+        console.log("🔍 Audit logs query result:", { auditLogs, auditError })
+
+        // Get user information separately
+        let auditLogsWithUsers = auditLogs || []
+        if (auditLogs && auditLogs.length > 0) {
+          const userIds = [...new Set(auditLogs.map(log => log.changed_by))]
+          const { data: users } = await supabase
+            .from("organization_users")
+            .select("user_id, full_name")
+            .in("user_id", userIds)
+
+          auditLogsWithUsers = auditLogs.map(log => ({
+            ...log,
+            user: { full_name: users?.find(u => u.user_id === log.changed_by)?.full_name || 'Unknown User' }
+          }))
+        }
+
+        // Attach audit logs to deliveries
+        const deliveriesWithAudit = deliveries.map((delivery: any) => ({
+          ...delivery,
+          audit_logs: auditLogsWithUsers?.filter(log => log.record_id === delivery.id) || []
+        }))
+
+        console.log("🔍 Deliveries with audit attached:", deliveriesWithAudit.map((d: any) => ({
+          id: d.id,
+          audit_count: d.audit_logs?.length || 0
+        })))
+
+        setDeliveryData(deliveriesWithAudit)
+      } else {
+        console.log("Delivery data loaded:", deliveries?.length || 0, "records")
+        setDeliveryData(deliveries || [])
+      }
     } catch (error) {
       console.error("Error loading delivery data:", error)
     }
@@ -340,13 +384,51 @@ export default function DashboardPage() {
         return
       }
 
-      console.log("Pickup data loaded:", pickups?.length || 0, "records")
-      console.log("First pickup sample:", pickups?.[0])
-      if (pickups?.[0]) {
-        console.log("Pickup structure - pickup_containers:", pickups[0].pickup_containers)
-        console.log("Pickup fields:", Object.keys(pickups[0]))
+      // Fetch audit logs separately
+      if (pickups && pickups.length > 0) {
+        const pickupIds = pickups.map((p: any) => p.id)
+        console.log("🔍 Fetching audit logs for pickup IDs:", pickupIds)
+        
+        const { data: auditLogs, error: auditError } = await supabase
+          .from("audit_logs")
+          .select("*")
+          .eq("table_name", "pickup")
+          .in("record_id", pickupIds)
+          .order("created_at", { ascending: false })
+
+        console.log("🔍 Pickup audit logs query result:", { auditLogs, auditError })
+
+        // Get user information separately
+        let auditLogsWithUsers = auditLogs || []
+        if (auditLogs && auditLogs.length > 0) {
+          const userIds = [...new Set(auditLogs.map((log: any) => log.changed_by))]
+          const { data: users } = await supabase
+            .from("organization_users")
+            .select("user_id, full_name")
+            .in("user_id", userIds)
+
+          auditLogsWithUsers = auditLogs.map((log: any) => ({
+            ...log,
+            user: { full_name: users?.find((u: any) => u.user_id === log.changed_by)?.full_name || 'Unknown User' }
+          }))
+        }
+
+        // Attach audit logs to pickups
+        const pickupsWithAudit = pickups.map((pickup: any) => ({
+          ...pickup,
+          audit_logs: auditLogsWithUsers?.filter((log: any) => log.record_id === pickup.id) || []
+        }))
+
+        console.log("🔍 Pickups with audit attached:", pickupsWithAudit.map((p: any) => ({
+          id: p.id,
+          audit_count: p.audit_logs?.length || 0
+        })))
+
+        setPickupData(pickupsWithAudit)
+      } else {
+        console.log("Pickup data loaded:", pickups?.length || 0, "records")
+        setPickupData(pickups || [])
       }
-      if (pickups) setPickupData(pickups)
     } catch (error) {
       console.error("Error loading pickup data:", error)
     }
@@ -362,6 +444,87 @@ export default function DashboardPage() {
       if (products) setAllProducts(products as unknown as Product[])
     } catch (error) {
       console.error("Error loading all products:", error)
+    }
+  }
+
+  const generateGrokSummary = async () => {
+    if (!deliveryData.length && !pickupData.length) {
+      setGrokSummary("No delivery or pickup data available for the selected date range.")
+      return
+    }
+
+    setLoadingGrokSummary(true)
+    try {
+      // Prepare data for Grok analysis
+      const summaryData = {
+        dateRange: {
+          start: dateRange.start,
+          end: dateRange.end,
+          days: Math.ceil((new Date(dateRange.end).getTime() - new Date(dateRange.start).getTime()) / (1000 * 60 * 60 * 24)) + 1
+        },
+        deliveries: {
+          total: deliveryData.length,
+          totalWeight: deliveryData.reduce((sum, d) => sum + Number(d.weight_tons || 0), 0),
+          byDay: deliveryData.reduce((acc, d) => {
+            const date = d.delivery_date
+            if (!acc[date]) acc[date] = { count: 0, weight: 0 }
+            acc[date].count += 1
+            acc[date].weight += Number(d.weight_tons || 0)
+            return acc
+          }, {} as Record<string, { count: number; weight: number }>),
+          products: deliveryData.reduce((acc, d) => {
+            const product = d.product?.name || 'Unknown'
+            if (!acc[product]) acc[product] = { count: 0, weight: 0 }
+            acc[product].count += 1
+            acc[product].weight += Number(d.weight_tons || 0)
+            return acc
+          }, {} as Record<string, { count: number; weight: number }>)
+        },
+        pickups: {
+          total: pickupData.length,
+          totalWeight: pickupData.reduce((sum, p) => sum + Number(p.weight_tons || 0), 0),
+          byDay: pickupData.reduce((acc, p) => {
+            const date = p.pickup_date
+            if (!acc[date]) acc[date] = { count: 0, weight: 0 }
+            acc[date].count += 1
+            acc[date].weight += Number(p.weight_tons || 0)
+            return acc
+          }, {} as Record<string, { count: number; weight: number }>),
+          products: pickupData.reduce((acc, p) => {
+            const product = p.product?.name || 'Unknown'
+            if (!acc[product]) acc[product] = { count: 0, weight: 0 }
+            acc[product].count += 1
+            acc[product].weight += Number(p.weight_tons || 0)
+            return acc
+          }, {} as Record<string, { count: number; weight: number }>)
+        },
+        currentStock: stats?.totalStock || 0,
+        organization: user?.organization?.name || 'Coal Yard'
+      }
+
+      // Call Grok API for analysis
+      const response = await fetch('/api/grok-summary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: `Analyze this coal yard operations data and provide a concise daily summary in 2-3 sentences. Focus on key insights, trends, and operational highlights.`,
+          data: summaryData
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate summary')
+      }
+
+      const result = await response.json()
+      setGrokSummary(result.summary || "Unable to generate summary at this time.")
+    } catch (error) {
+      console.error("Error generating Grok summary:", error)
+      setGrokSummary("Unable to generate summary. Please try again later.")
+    } finally {
+      setLoadingGrokSummary(false)
     }
   }
 
@@ -598,6 +761,9 @@ export default function DashboardPage() {
                       <div className="flex flex-col w-full">
                         <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
                           <DialogTitle className="text-xl font-bold text-gray-800">Filter by Date Range</DialogTitle>
+                          <DialogDescription className="text-gray-600">
+                            Select start and end dates to filter your delivery and pickup records
+                          </DialogDescription>
                         </DialogHeader>
                         <div className="flex-1 p-6 space-y-4 overflow-y-auto">
                           <div>
@@ -642,6 +808,9 @@ export default function DashboardPage() {
                       <div className="flex flex-col w-full">
                         <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
                           <DialogTitle className="text-xl font-bold text-gray-800">Select Coal Yard to Edit</DialogTitle>
+                          <DialogDescription className="text-gray-600">
+                            Choose a coal yard to modify its settings and information
+                          </DialogDescription>
                         </DialogHeader>
                         <div className="flex-1 p-6 space-y-4 max-h-[50vh] overflow-y-auto">
                           {coalYards.map((yard) => (
@@ -1012,7 +1181,12 @@ export default function DashboardPage() {
                       },
                       {} as Record<string, any[]>,
                     ),
-                  ).map(([date, deliveries]: [string, any[]]) => (
+                  )
+                  .sort(([dateA], [dateB]) => {
+                    // Sort by date, newest first
+                    return new Date(dateB).getTime() - new Date(dateA).getTime()
+                  })
+                  .map(([date, deliveries]: [string, any[]]) => (
                     <div key={date}>
                       <div className="flex items-center gap-2 mb-4">
                         <div className="bg-gray-100 p-2 rounded-lg">
@@ -1037,6 +1211,14 @@ export default function DashboardPage() {
                                   <div>
                                     <p className="font-semibold text-gray-800 text-lg">
                                       Weighbridge Number: {delivery.weighbridge_slip || delivery.id || "N/A"}
+                                      {/* Edit indicator - will show when audit system is implemented */}
+                                      {delivery.audit_logs && delivery.audit_logs.length > 0 && (
+                                        <span className="ml-2 inline-flex items-center">
+                                          <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.828-2.828z" />
+                                          </svg>
+                                        </span>
+                                      )}
                                     </p>
                                     <p className="text-gray-600 text-sm mt-1">
                                       {delivery.product?.name || "Mixed Products"}
@@ -1113,6 +1295,67 @@ export default function DashboardPage() {
                                       </div>
                                     )}
                                   </div>
+
+                                  {/* Audit Trail Section */}
+                                  {delivery.audit_logs && delivery.audit_logs.length > 0 && (
+                                    <div className="mt-4 pt-4 border-t border-gray-200">
+                                      <div className="flex items-center gap-2 mb-3">
+                                        <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.828-2.828z" />
+                                        </svg>
+                                        <span className="font-semibold text-gray-800 text-sm">Edit History</span>
+                                      </div>
+                                      <div className="space-y-3 max-h-48 overflow-y-auto">
+                                        {delivery.audit_logs.map((audit: any, index: number) => (
+                                          <div key={audit.id} className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                                            <div className="flex items-center justify-between mb-2">
+                                              <span className="text-xs font-medium text-blue-700 uppercase tracking-wide">
+                                                {audit.action || 'EDIT'}
+                                              </span>
+                                              <span className="text-xs text-gray-500">
+                                                {new Date(audit.created_at).toLocaleString()}
+                                              </span>
+                                            </div>
+                                            <div className="text-sm text-gray-700 mb-2">
+                                              <span className="font-medium">Edited by:</span> {audit.user?.full_name || 'Unknown User'}
+                                            </div>
+                                            {audit.old_values && audit.new_values && (
+                                              <div className="space-y-1 text-xs">
+                                                {Object.keys(audit.new_values).map((field: string) => {
+                                                  const oldValue = audit.old_values[field]
+                                                  const newValue = audit.new_values[field]
+                                                  if (oldValue === newValue) return null
+                                                  
+                                                  // Skip coal_yard_id (users don't need to see raw database IDs)
+                                                  if (field === 'coal_yard_id') return null
+                                                  
+                                                  // Skip complex objects like containers
+                                                  if (typeof oldValue === 'object' || typeof newValue === 'object') {
+                                                    return null
+                                                  }
+                                                  
+                                                  return (
+                                                    <div key={field} className="flex items-center gap-2">
+                                                      <span className="font-medium text-gray-600 capitalize">
+                                                        {field.replace(/_/g, ' ')}:
+                                                      </span>
+                                                      <span className="text-red-600 line-through">
+                                                        {field.includes('weight') ? `${oldValue}t` : String(oldValue || '')}
+                                                      </span>
+                                                      <span className="text-gray-400">→</span>
+                                                      <span className="text-green-600 font-medium">
+                                                        {field.includes('weight') ? `${newValue}t` : String(newValue || '')}
+                                                      </span>
+                                                    </div>
+                                                  )
+                                                })}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1158,7 +1401,12 @@ export default function DashboardPage() {
                       },
                       {} as Record<string, any[]>,
                     ),
-                  ).map(([date, pickups]: [string, any[]]) => (
+                  )
+                  .sort(([dateA], [dateB]) => {
+                    // Sort by date, newest first
+                    return new Date(dateB).getTime() - new Date(dateA).getTime()
+                  })
+                  .map(([date, pickups]: [string, any[]]) => (
                     <div key={date}>
                       <div className="flex items-center gap-2 mb-4">
                         <div className="bg-gray-100 p-2 rounded-lg">
@@ -1186,6 +1434,14 @@ export default function DashboardPage() {
                                   <div>
                                     <p className="font-semibold text-gray-800 text-lg">
                                       Container SARU | {pickup.container_number || pickup.weighbridge_slip || pickup.id || "N/A"}
+                                      {/* Edit indicator - will show when audit system is implemented */}
+                                      {pickup.audit_logs && pickup.audit_logs.length > 0 && (
+                                        <span className="ml-2 inline-flex items-center">
+                                          <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.828-2.828z" />
+                                          </svg>
+                                        </span>
+                                      )}
                                     </p>
                                     <p className="text-gray-600 text-sm mt-1">
                                       {pickup.product?.name || "Mixed Products"}
@@ -1287,6 +1543,67 @@ export default function DashboardPage() {
                                       </div>
                                     )}
                                   </div>
+
+                                  {/* Audit Trail Section */}
+                                  {pickup.audit_logs && pickup.audit_logs.length > 0 && (
+                                    <div className="mt-4 pt-4 border-t border-gray-200">
+                                      <div className="flex items-center gap-2 mb-3">
+                                        <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.828-2.828z" />
+                                        </svg>
+                                        <span className="font-semibold text-gray-800 text-sm">Edit History</span>
+                                      </div>
+                                      <div className="space-y-3 max-h-48 overflow-y-auto">
+                                        {pickup.audit_logs.map((audit: any, index: number) => (
+                                          <div key={audit.id} className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                                            <div className="flex items-center justify-between mb-2">
+                                              <span className="text-xs font-medium text-blue-700 uppercase tracking-wide">
+                                                {audit.action || 'EDIT'}
+                                              </span>
+                                              <span className="text-xs text-gray-500">
+                                                {new Date(audit.created_at).toLocaleString()}
+                                              </span>
+                                            </div>
+                                            <div className="text-sm text-gray-700 mb-2">
+                                              <span className="font-medium">Edited by:</span> {audit.user?.full_name || 'Unknown User'}
+                                            </div>
+                                            {audit.old_values && audit.new_values && (
+                                              <div className="space-y-1 text-xs">
+                                                {Object.keys(audit.new_values).map((field: string) => {
+                                                  const oldValue = audit.old_values[field]
+                                                  const newValue = audit.new_values[field]
+                                                  if (oldValue === newValue) return null
+                                                  
+                                                  // Skip coal_yard_id (users don't need to see raw database IDs)
+                                                  if (field === 'coal_yard_id') return null
+                                                  
+                                                  // Skip complex objects like containers
+                                                  if (typeof oldValue === 'object' || typeof newValue === 'object') {
+                                                    return null
+                                                  }
+                                                  
+                                                  return (
+                                                    <div key={field} className="flex items-center gap-2">
+                                                      <span className="font-medium text-gray-600 capitalize">
+                                                        {field.replace(/_/g, ' ')}:
+                                                      </span>
+                                                      <span className="text-red-600 line-through">
+                                                        {field.includes('weight') ? `${oldValue}t` : String(oldValue || '')}
+                                                      </span>
+                                                      <span className="text-gray-400">→</span>
+                                                      <span className="text-green-600 font-medium">
+                                                        {field.includes('weight') ? `${newValue}t` : String(newValue || '')}
+                                                      </span>
+                                                    </div>
+                                                  )
+                                                })}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1337,6 +1654,9 @@ export default function DashboardPage() {
           <div className="flex flex-col w-full">
             <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
               <DialogTitle className="text-xl font-bold text-gray-800">Add new deliveries or pick ups</DialogTitle>
+              <DialogDescription className="text-gray-600">
+                Choose whether to record new deliveries coming in or pickups going out
+              </DialogDescription>
             </DialogHeader>
             <div className="flex-1 p-6 space-y-4 overflow-y-auto">
               <Button
@@ -1458,6 +1778,9 @@ export default function DashboardPage() {
               <DialogTitle className="text-xl font-bold text-gray-800">
                 Edit {recordType === 'delivery' ? 'Delivery' : 'Pickup'} Record
               </DialogTitle>
+              <DialogDescription className="text-gray-600">
+                Modify the details of this {recordType} record
+              </DialogDescription>
             </DialogHeader>
             <div className="flex-1 p-6">
               <p className="text-gray-600 mb-4">
@@ -1494,6 +1817,9 @@ export default function DashboardPage() {
               <DialogTitle className="text-xl font-bold text-gray-800">
                 Delete {recordType === 'delivery' ? 'Delivery' : 'Pickup'} Record
               </DialogTitle>
+              <DialogDescription className="text-gray-600">
+                Permanently remove this {recordType} record from your system
+              </DialogDescription>
             </DialogHeader>
             <div className="flex-1 p-6">
               <p className="text-gray-600 mb-6">
@@ -1528,6 +1854,9 @@ export default function DashboardPage() {
               <DialogTitle className="text-xl font-bold text-gray-800">
                 {recordType === 'delivery' ? 'Delivery' : 'Pickup'} Options
               </DialogTitle>
+              <DialogDescription className="text-gray-600">
+                Choose an action to perform on this {recordType} record
+              </DialogDescription>
             </DialogHeader>
             <div className="flex-1 p-6 space-y-4">
               <Button
