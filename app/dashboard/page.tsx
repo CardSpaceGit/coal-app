@@ -295,7 +295,7 @@ export default function DashboardPage() {
           product:products(name, image_url)
         `)
         .eq("organization_id", user.organization.id)
-        .order("delivery_date", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(20)
 
       if (error) {
@@ -332,7 +332,7 @@ export default function DashboardPage() {
           product:products(name, image_url)
         `)
         .eq("organization_id", user.organization.id)
-        .order("pickup_date", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(20)
 
       if (error) {
@@ -462,54 +462,32 @@ export default function DashboardPage() {
 
         console.log("Delivery deleted successfully")
       } else if (recordType === 'pickup') {
-        // For pickups, we need to add back the stock that was taken out
-        // Find all pickup records that should be deleted together (same session)
-        // This includes records with the same date, container number, and coal yard
-        const { data: relatedPickupRecords, error: fetchError } = await supabase
-          .from("pickup")
-          .select("*")
-          .eq("pickup_date", selectedRecord.pickup_date)
-          .eq("container_number", selectedRecord.container_number)
-          .eq("coal_yard_id", selectedRecord.coal_yard_id)
-          .eq("organization_id", (userData as any).organization_id)
+        // For pickups, add back the stock that was taken out for this specific record
+        const { error: stockError } = await supabase.rpc("update_stock_on_delivery", {
+          p_coal_yard_id: selectedRecord.coal_yard_id,
+          p_product_id: selectedRecord.product_id,
+          p_organization_id: (userData as any).organization_id,
+          p_weight_tons: selectedRecord.weight_tons,
+        })
 
-        if (fetchError) {
-          console.error("Error fetching related pickup records:", fetchError)
-          throw new Error(`Failed to fetch related pickup records: ${fetchError.message}`)
+        if (stockError) {
+          console.error("Error adding back stock:", stockError)
+          throw new Error(`Failed to add back stock for product ${selectedRecord.product_id}: ${stockError.message}`)
         }
 
-        console.log(`Found ${relatedPickupRecords?.length || 0} related pickup records to delete`)
-
-        // Reverse stock for each product that was picked up
-        for (const record of relatedPickupRecords || []) {
-          const { error: stockError } = await supabase.rpc("update_stock_on_delivery", {
-            p_coal_yard_id: record.coal_yard_id,
-            p_product_id: record.product_id,
-            p_organization_id: (userData as any).organization_id,
-            p_weight_tons: record.weight_tons,
-          })
-
-          if (stockError) {
-            console.error("Error adding back stock:", stockError)
-            throw new Error(`Failed to add back stock for product ${record.product_id}: ${stockError.message}`)
-          }
-        }
-
-        // Then delete all related pickup records
+        // Then delete only this specific pickup record
         const { error: deleteError } = await supabase
           .from("pickup")
           .delete()
-          .eq("pickup_date", selectedRecord.pickup_date)
-          .eq("container_number", selectedRecord.container_number)
-          .eq("coal_yard_id", selectedRecord.coal_yard_id)
+          .eq("id", selectedRecord.id)
           .eq("organization_id", (userData as any).organization_id)
 
         if (deleteError) {
-          console.error("Error deleting pickup records:", deleteError)
-          throw new Error(`Failed to delete pickup records: ${deleteError.message}`)
+          console.error("Error deleting pickup record:", deleteError)
+          throw new Error(`Failed to delete pickup record: ${deleteError.message}`)
         }
 
-        console.log("Pickup records deleted successfully")
+        console.log("Pickup record deleted successfully")
       }
 
       // Close modal and refresh data
@@ -1058,7 +1036,7 @@ export default function DashboardPage() {
                                   </div>
                                   <div>
                                     <p className="font-semibold text-gray-800 text-lg">
-                                      Weighbridge Number {delivery.weighbridge_slip || delivery.id || "N/A"}
+                                      Weighbridge Number: {delivery.weighbridge_slip || delivery.id || "N/A"}
                                     </p>
                                     <p className="text-gray-600 text-sm mt-1">
                                       {delivery.product?.name || "Mixed Products"}

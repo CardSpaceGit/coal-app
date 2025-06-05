@@ -950,87 +950,13 @@ export default function PickupsPage() {
                   <p className="text-xs text-gray-500 mb-2">This is the total product weight in the container.</p>
                   <div className="relative">
                     <Weight className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      type="number"
-                      step="any"
+                    <input
+                      type="text"
+                      inputMode="decimal"
                       value={container.weight}
-                      onChange={(e) => {
-                        const newWeight = e.target.value
-
-                        if (newWeight === "") {
-                          updateContainer(container.id, "weight", newWeight)
-                          return
-                        }
-
-                        const weightValue = Number(newWeight)
-                        if (weightValue < 0) return
-
-                        // Calculate total weight allocation across all containers for each product
-                        const productWeightAllocations: Record<string, number> = {}
-
-                        containers.forEach((c) => {
-                          if (c.id === container.id) {
-                            // For current container, use the new weight being entered
-                            if (c.selectedProducts.length > 0) {
-                              const weightPerProduct = weightValue / c.selectedProducts.length
-                              c.selectedProducts.forEach((productId) => {
-                                productWeightAllocations[productId] =
-                                  (productWeightAllocations[productId] || 0) + weightPerProduct
-                              })
-                            }
-                          } else {
-                            // For other containers, use their existing weight
-                            if (c.selectedProducts.length > 0 && c.weight) {
-                              const weightPerProduct = Number.parseFloat(c.weight) / c.selectedProducts.length
-                              c.selectedProducts.forEach((productId) => {
-                                productWeightAllocations[productId] =
-                                  (productWeightAllocations[productId] || 0) + weightPerProduct
-                              })
-                            }
-                          }
-                        })
-
-                        // Check if any product allocation exceeds available stock
-                        let exceedsStock = false
-                        let exceededProduct = ""
-
-                        for (const [productId, allocatedWeight] of Object.entries(productWeightAllocations)) {
-                          const availableStock = productStock[productId] || 0
-                          if (allocatedWeight > availableStock) {
-                            exceedsStock = true
-                            exceededProduct = products.find((p) => p.id === productId)?.name || "Unknown"
-                            break
-                          }
-                        }
-
-                        if (exceedsStock) {
-                          toast({
-                            title: "Weight Exceeds Available Stock",
-                            description: `Total allocated weight for ${exceededProduct} across all containers exceeds available stock. Please adjust the weights.`,
-                            variant: "destructive",
-                            duration: 4000,
-                          })
-                          return
-                        }
-
-                        // Also check individual container max weight (existing logic)
-                        const maxWeight = calculateMaxAvailableWeight(container.selectedProducts)
-                        if (weightValue > maxWeight) {
-                          toast({
-                            title: "Weight Exceeds Container Limit",
-                            description: `Maximum available weight for this container is ${maxWeight.toLocaleString()} t based on selected products.`,
-                            variant: "destructive",
-                            duration: 3000,
-                          })
-                          return
-                        }
-
-                        updateContainer(container.id, "weight", newWeight)
-                      }}
+                      onChange={(e) => updateContainer(container.id, "weight", e.target.value)}
                       placeholder="2,000"
-                      className="pl-10 rounded-full border-gray-300"
-                      min="0"
-                      max={calculateMaxAvailableWeight(container.selectedProducts)}
+                      className="flex h-10 w-full rounded-full border border-gray-300 bg-background px-3 py-2 pl-10 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">t</span>
                   </div>
