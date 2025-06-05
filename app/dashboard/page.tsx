@@ -1448,7 +1448,7 @@ export default function DashboardPage() {
                   .map(([date, deliveries]: [string, any[]]) => (
                     <div key={date}>
                       <div className="flex items-center gap-2 mb-4">
-                        <div className="bg-gray-100 p-2 rounded-lg">
+                        <div className="bg-gray-100 p-2 rounded-2xl">
                           <Calendar1 size={20} className="text-gray-700" />
                         </div>
                         <h3 className="text-md font-bold text-gray-800">{date}</h3>
@@ -1464,13 +1464,13 @@ export default function DashboardPage() {
                                   onClick={() => toggleContainer(delivery.id)}
                                 >
                                 <div className="flex items-center gap-4">
-                                  <div className="bg-gray-800 p-3 rounded-2xl">
+                                  <div className="rounded-2xl">
                                     <Image
                                       src="/delivery.jpg"
                                       alt="Delivery"
                                       width={24}
                                       height={24}
-                                      className="w-8 h-8 object-cover rounded-[24px]"
+                                      className="w-12 h-12 object-cover rounded-[24px]"
                                     />
                                   </div>
                                   <div>
@@ -1668,10 +1668,10 @@ export default function DashboardPage() {
                   .map(([date, pickups]: [string, any[]]) => (
                     <div key={date}>
                       <div className="flex items-center gap-2 mb-4">
-                        <div className="bg-gray-100 p-2 rounded-lg">
+                        <div className="bg-gray-100 p-2 rounded-[24px]">
                           <Calendar1 size={20} className="text-gray-700" />
                         </div>
-                        <h3 className="text-xl font-bold text-gray-800">{date}</h3>
+                        <h3 className="text-md font-bold text-gray-800">{date}</h3>
                       </div>
 
                       <div className="space-y-3">
@@ -1681,23 +1681,23 @@ export default function DashboardPage() {
                           const containerCount = pickup.pickup_containers?.length || 1
 
                           return (
-                            <div key={pickup.id} className={`bg-white rounded-2xl p-4 border ${isExpanded ? 'border-gray-600' : 'border-gray-100'} shadow-sm`}>
+                            <div key={pickup.id} className={`bg-white rounded-[24px] p-4 border ${isExpanded ? 'border-gray-600' : 'border-gray-100'}`}>
                               <div
                                 className="flex items-center justify-between cursor-pointer"
                                 onClick={() => toggleContainer(pickup.id)}
                               >
                                 <div className="flex items-center gap-4">
-                                  <div className="bg-gray-800 p-3 rounded-lg">
+                                  <div className="rounded-2xl">
                                     <Image
                                       src="/pickups.jpg"
                                       alt="Pickup"
                                       width={24}
                                       height={24}
-                                      className="w-6 h-6 object-cover rounded"
+                                      className="w-12 h-12 object-cover rounded-[24px]"
                                     />
                                   </div>
                                   <div>
-                                    <p className="font-semibold text-gray-800 text-lg">
+                                    <p className="font-semibold text-gray-800 text-md">
                                       Container SARU | {pickup.container_number || pickup.weighbridge_slip || pickup.id || "N/A"}
                                       {/* Edit indicator - will show when audit system is implemented */}
                                       {pickup.audit_logs && pickup.audit_logs.length > 0 && (
@@ -1713,7 +1713,7 @@ export default function DashboardPage() {
                                 </div>
                                 <div className="flex items-center gap-3">
                                   <div className="text-right">
-                                    <p className="text-2xl font-bold text-gray-800">{totalWeight?.toLocaleString()}t</p>
+                                    <p className="text-md font-bold text-gray-800">{totalWeight?.toLocaleString()}t</p>
                                   </div>
                                   <button
                                     onClick={(e) => {
@@ -1739,15 +1739,15 @@ export default function DashboardPage() {
                                   <div className="space-y-3">
                                     {pickup.pickup_containers?.map((container: any, index: number) => 
                                       container.pickup_container_products?.map((containerProduct: any, productIndex: number) => (
-                                        <div key={`${container.id}-${productIndex}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-[24px]">
+                                        <div key={`${container.id}-${productIndex}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl">
                                           <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 bg-gray-800 rounded-2xl flex items-center justify-center">
+                                            <div className="w-16 h-16 rounded-[24px] flex items-center justify-center">
                                               <Image
                                                 src={containerProduct.product?.image_url || "/placeholder.svg?height=48&width=48&text=Coal"}
                                                 alt={containerProduct.product?.name || "Product"}
                                                 width={48}
                                                 height={48}
-                                                className="w-10 h-10 object-cover rounded"
+                                                className="w-16 h-16 object-cover rounded-[24px]"
                                               />
                                             </div>
                                             <div>
@@ -1756,20 +1756,20 @@ export default function DashboardPage() {
                                             </div>
                                           </div>
                                           <div className="text-right">
-                                            <p className="text-lg font-bold text-gray-800">{containerProduct.weight_tons?.toLocaleString()} t</p>
+                                            <p className="text-md font-bold text-gray-800">{containerProduct.weight_tons?.toLocaleString()} t</p>
                                           </div>
                                         </div>
                                       ))
                                     ) || (
-                                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl">
                                         <div className="flex items-center gap-4">
-                                          <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
+                                          <div className="w-16 h-16 rounded-[24px] flex items-center justify-center">
                                             <Image
                                               src="/placeholder.svg?height=48&width=48&text=Coal"
                                               alt="Product"
                                               width={48}
                                               height={48}
-                                              className="w-10 h-10 object-cover rounded"
+                                              className="w-16 h-16 object-cover rounded-[24px]"
                                             />
                                           </div>
                                           <div>
@@ -1778,7 +1778,7 @@ export default function DashboardPage() {
                                           </div>
                                         </div>
                                         <div className="text-right">
-                                          <p className="text-xl font-bold text-gray-800">{totalWeight?.toLocaleString()} t</p>
+                                          <p className="text-md font-bold text-gray-800">{totalWeight?.toLocaleString()} t</p>
                                         </div>
                                       </div>
                                     )}
@@ -1814,7 +1814,7 @@ export default function DashboardPage() {
                                       </div>
                                       <div className="space-y-3 max-h-48 overflow-y-auto">
                                         {pickup.audit_logs.map((audit: any, index: number) => (
-                                          <div key={audit.id} className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                                          <div key={audit.id} className="bg-blue-50 rounded-[20px] p-3 border border-blue-100">
                                             <div className="flex items-center justify-between mb-2">
                                               <span className="text-xs font-medium text-blue-700 uppercase tracking-wide">
                                                 {audit.action || 'EDIT'}
