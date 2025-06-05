@@ -483,60 +483,31 @@ export default function DashboardPage() {
     try {
       console.log("🔍 Dashboard: Loading products for organization:", user.organization.id)
       
-      // Get products that have EVER had stock for this organization OR have been used in deliveries/pickups
-      const [stockProducts, deliveryProducts, pickupProducts] = await Promise.all([
-        // All products that have ever had stock records (including current zero stock)
-        supabase
-          .from("stock")
-          .select("product:products(*)")
-          .eq("organization_id", user.organization.id),
-        
-        // Products used in deliveries
-        supabase
-          .from("deliveries")
-          .select("product:products(*)")
-          .eq("organization_id", user.organization.id),
-          
-        // Products used in pickups
-        supabase
-          .from("pickup")
-          .select("product:products(*)")
-          .eq("organization_id", user.organization.id)
-      ])
+      // Get organization details to access product_names
+      const { data: orgData } = await supabase
+        .from("organizations")
+        .select("product_names")
+        .eq("id", user.organization.id)
+        .single()
 
-      console.log("🔍 Dashboard: Stock products result:", stockProducts.data?.length || 0)
-      console.log("🔍 Dashboard: Delivery products result:", deliveryProducts.data?.length || 0)
-      console.log("🔍 Dashboard: Pickup products result:", pickupProducts.data?.length || 0)
+      if (!orgData?.product_names) {
+        console.error("❌ Dashboard: Organization product names not found")
+        setAllProducts([])
+        return
+      }
 
-      // Combine all products and remove duplicates
-      const allRelevantProducts = new Map()
+      console.log("✅ Dashboard: Organization product names:", orgData.product_names)
+
+      // Get products for this organization based on product_names array
+      const { data: products } = await supabase
+        .from("products")
+        .select("*")
+        .in("name", orgData.product_names as string[])
+        .order("name")
       
-      stockProducts.data?.forEach((item: any) => {
-        if (item.product) {
-          console.log("📦 Adding stock product:", item.product.name)
-          allRelevantProducts.set(item.product.id, item.product)
-        }
-      })
+      console.log("✅ Dashboard: Loaded products:", products?.map(p => p.name) || [])
       
-      deliveryProducts.data?.forEach((item: any) => {
-        if (item.product) {
-          console.log("🚚 Adding delivery product:", item.product.name)
-          allRelevantProducts.set(item.product.id, item.product)
-        }
-      })
-      
-      pickupProducts.data?.forEach((item: any) => {
-        if (item.product) {
-          console.log("📤 Adding pickup product:", item.product.name)
-          allRelevantProducts.set(item.product.id, item.product)
-        }
-      })
-
-      const uniqueProducts = Array.from(allRelevantProducts.values())
-        .sort((a: any, b: any) => a.name.localeCompare(b.name))
-
-      console.log("✅ Dashboard: Final unique products:", uniqueProducts.map((p: any) => p.name))
-      setAllProducts(uniqueProducts as unknown as Product[])
+      if (products) setAllProducts(products as unknown as Product[])
     } catch (error) {
       console.error("Error loading all products:", error)
     }
@@ -1239,45 +1210,47 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Product Stock Chart */}
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4 my-12">
-                      {Object.entries(productStockByType).map(([productName, { weight, product }]) => {
-                        const maxWeight = Math.max(...Object.values(productStockByType).map(p => p.weight))
-                        const percentage = maxWeight > 0 ? (weight / maxWeight) * 100 : 0
-                        const stockpileNumber = allProducts.findIndex(p => p.name === productName) + 1
+                                    <div className="space-y-4">
+                    <div className="flex justify-center">
+                      <div className={`grid gap-24 my-12 justify-center items-center max-w-6xl mx-auto`} style={{ gridTemplateColumns: `repeat(${Math.min(Object.keys(productStockByType).length, 6)}, minmax(0, 1fr))` }}>
+                        {Object.entries(productStockByType).map(([productName, { weight, product }]) => {
+                          const maxWeight = Math.max(...Object.values(productStockByType).map(p => p.weight))
+                          const percentage = maxWeight > 0 ? (weight / maxWeight) * 100 : 0
+                          const stockpileNumber = allProducts.findIndex(p => p.name === productName) + 1
 
-                        return (
-                          <div key={productName} className="flex flex-col items-center">
-                            {/* Weight Display */}
-                            <div className="text-lg font-bold text-gray-800 mb-2">{weight.toLocaleString()} t</div>
+                          return (
+                            <div key={productName} className="flex flex-col items-center">
+                              {/* Weight Display */}
+                              <div className="text-lg font-bold text-gray-800 mb-2">{weight.toLocaleString()} t</div>
 
-                            {/* Vertical Bar */}
-                            <div className="w-16 h-32 bg-gray-200 rounded-[24px] flex items-end mb-3">
-                              <div
-                                className="w-full bg-gray-800 rounded-[24px] transition-all duration-300"
-                                style={{ height: `${percentage}%` }}
-                              />
+                              {/* Vertical Bar */}
+                              <div className="w-16 h-32 bg-gray-200 rounded-[24px] flex items-end mb-3">
+                                <div
+                                  className="w-full bg-gray-800 rounded-[24px] transition-all duration-300"
+                                  style={{ height: `${percentage}%` }}
+                                />
+                              </div>
+
+                              {/* Product Image */}
+                              <div className="w-20 h-20">
+                                <Image
+                                  src={product?.image_url || "/placeholder.svg?height=48&width=48&text=Coal"}
+                                  alt={productName}
+                                  width={48}
+                                  height={48}
+                                  className="w-full h-full object-cover rounded-lg"
+                                />
+                              </div>
+
+                              {/* Product Name and Stockpile */}
+                              <div className="text-center">
+                                <p className="font-semibold text-gray-800 text-sm">{productName}</p>
+                                <p className="text-xs text-gray-500">Stockpile {stockpileNumber}</p>
+                              </div>
                             </div>
-
-                            {/* Product Image */}
-                            <div className="w-20 h-20">
-                              <Image
-                                src={product?.image_url || "/placeholder.svg?height=48&width=48&text=Coal"}
-                                alt={productName}
-                                width={48}
-                                height={48}
-                                className="w-full h-full object-cover rounded-lg"
-                              />
-                            </div>
-
-                            {/* Product Name and Stockpile */}
-                            <div className="text-center">
-                              <p className="font-semibold text-gray-800 text-sm">{productName}</p>
-                              <p className="text-xs text-gray-500">Stockpile {stockpileNumber}</p>
-                            </div>
-                          </div>
-                        )
-                      })}
+                          )
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1934,7 +1907,7 @@ export default function DashboardPage() {
                           />
                         </div>
                       </div>
-                      <p className="text-gray-500">No pickups found</p>
+                      <p className="text-gray-500 text-lg">No pickups found</p>
                     </div>
                   )}
                 </>

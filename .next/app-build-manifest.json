@@ -21,20 +21,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/dashboard/page.js"
     ],
-    "/deliveries/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/deliveries/page.js"
-    ],
     "/api/grok-summary/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/grok-summary/route.js"
     ],
-    "/pickups/page": [
+    "/_not-found/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/pickups/page.js"
+      "static/chunks/app/_not-found/page.js"
     ]
   }
 }
