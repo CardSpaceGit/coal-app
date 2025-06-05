@@ -990,7 +990,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Date Range Display with Export Button */}
-            <div className="flex items-center justify-between gap-4 text-gray-600 mb-6 bg-gray-50 p-3 rounded-[16px]">
+            <div className="flex items-center justify-between gap-4 text-gray-600 mb-6 bg-gray-50 p-3 rounded-[20px]">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Calendar1 size={16} />
@@ -1119,10 +1119,10 @@ export default function DashboardPage() {
             </div>
 
             <div className="w-full">
-              <div className="flex space-x-8 mb-6">
+              <div className="flex space-x-8 mb-6 mt-10">
                 <button
                   onClick={() => setStockActivityTab("stock")}
-                  className={`text-3xl pb-1 transition-all ${
+                  className={`text-xl pb-1 transition-all ${
                     stockActivityTab === "stock"
                       ? "font-bold text-gray-800 border-b-2 border-gray-800"
                       : "font-light text-gray-500 hover:text-gray-700"
@@ -1132,7 +1132,7 @@ export default function DashboardPage() {
                 </button>
                 <button
                   onClick={() => setStockActivityTab("activity")}
-                  className={`text-3xl pb-1 transition-all ${
+                  className={`text-xl pb-1 transition-all ${
                     stockActivityTab === "activity"
                       ? "font-bold text-gray-800 border-b-2 border-gray-800"
                       : "font-light text-gray-500 hover:text-gray-700"
@@ -1147,7 +1147,7 @@ export default function DashboardPage() {
                 <div className="mt-0">
                   {/* Current Stock Content */}
                   <div className="flex items-center justify-center mb-6">
-                    <div className="relative w-[350px] h-[350px]">
+                    <div className="relative w-[400px] h-[400px]">
                       <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                         <circle cx="50" cy="50" r="40" stroke="#e5e7eb" strokeWidth="8" fill="none" />
                         <circle
@@ -1162,14 +1162,14 @@ export default function DashboardPage() {
                         />
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <p className="text-lg text-gray-600 mb-2">Total available stock</p>
+                        <p className="text-md text-gray-600 mb-2">Total available stock</p>
                         <p className="text-5xl font-bold text-gray-800">{stats?.totalStock.toLocaleString() || 0} t</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Weekly Metrics */}
-                  <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="grid grid-cols-2 gap-0 mb-6">
                     <div className="text-center">
                       <p className="text-sm text-gray-600 mb-1">Total Deliveries</p>
                       <p className="text-2xl font-bold text-gray-800">
@@ -1188,8 +1188,7 @@ export default function DashboardPage() {
 
                   {/* Product Stock Chart */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800">Product Inventory</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4 my-12">
                       {Object.entries(productStockByType).map(([productName, { weight, product }]) => {
                         const maxWeight = Math.max(...Object.values(productStockByType).map(p => p.weight))
                         const percentage = maxWeight > 0 ? (weight / maxWeight) * 100 : 0
@@ -1201,15 +1200,15 @@ export default function DashboardPage() {
                             <div className="text-lg font-bold text-gray-800 mb-2">{weight.toLocaleString()} t</div>
 
                             {/* Vertical Bar */}
-                            <div className="w-16 h-32 bg-gray-200 rounded-lg flex items-end mb-3">
+                            <div className="w-16 h-32 bg-gray-200 rounded-[24px] flex items-end mb-3">
                               <div
-                                className="w-full bg-gray-800 rounded-lg transition-all duration-300"
+                                className="w-full bg-gray-800 rounded-[24px] transition-all duration-300"
                                 style={{ height: `${percentage}%` }}
                               />
                             </div>
 
                             {/* Product Image */}
-                            <div className="w-12 h-12 mb-2">
+                            <div className="w-20 h-20">
                               <Image
                                 src={product?.image_url || "/placeholder.svg?height=48&width=48&text=Coal"}
                                 alt={productName}
@@ -1233,17 +1232,17 @@ export default function DashboardPage() {
               )}
 
               {stockActivityTab === "activity" && (
-                <div className="mt-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                <div className="mt-12 mb-2">
+                  <div className="bg-gray-50 rounded-[32px] p-6 border border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-24 mb-0">
                     {/* Deliveries Section */}
                     <div>
                       <h3 className="text-xl font-bold text-gray-800 mb-4">Deliveries</h3>
                       <div className="space-y-3">
                         <div className="flex justify-between">
                           <span className="text-gray-600"># of Deliveries:</span>
-                          <span className="font-semibold">{stats?.totalDeliveries || 0}</span>
+                          <span className="font-bold text-lg ml-2">{stats?.totalDeliveries || 0}</span>
                         </div>
-                        <div>
+                        <div className="flex justify-between">
                           <span className="text-gray-600">Total delivered weight:</span>
                           <span className="font-bold text-lg ml-2">
                             {stats?.totalDeliveryWeight.toLocaleString() || 0} t
@@ -1258,9 +1257,9 @@ export default function DashboardPage() {
                       <div className="space-y-3">
                         <div className="flex justify-between">
                           <span className="text-gray-600"># of Pickups:</span>
-                          <span className="font-semibold">{stats?.totalPickups || 0}</span>
+                          <span className="font-bold text-lg ml-2">{stats?.totalPickups || 0}</span>
                         </div>
-                        <div>
+                        <div className="flex justify-between">
                           <span className="text-gray-600">Total pickup weight:</span>
                           <span className="font-bold text-lg ml-2">
                             {stats?.totalPickupWeight.toLocaleString() || 0} t
@@ -1271,7 +1270,7 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Legend */}
-                  <div className="flex items-center justify-center gap-6 mb-6">
+                  <div className="flex items-center justify-center gap-6 mt-12 mb-6">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                       <span className="text-sm text-gray-600">Delivery</span>
@@ -1284,21 +1283,32 @@ export default function DashboardPage() {
 
                   {/* Weekly Activity Grid */}
                   <div className="space-y-4">
-                    <h4 className="text-lg font-semibold text-gray-800 mb-4">Weekly Activity Overview</h4>
                     {coalYards.map((yard) => {
                       const yardActivity = weeklyActivityData[yard.id] || { deliveries: [], pickups: [] }
 
-                      return (
-                        <div key={yard.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center">
-                              <span className="text-white font-bold text-sm">{yard.code}</span>
+                                              return (
+                          <div key={yard.id} className="bg-gray-50 rounded-[32px] p-6 border border-gray-200">
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center">
+                                {yard.image_url ? (
+                                  <Image
+                                    src={yard.image_url}
+                                    alt={yard.name}
+                                    width={40}
+                                    height={40}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gray-800 rounded-xl flex items-center justify-center">
+                                    <span className="text-white font-bold text-sm">{yard.code}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <h5 className="font-semibold text-gray-800">{yard.name}</h5>
+                                <p className="text-sm text-gray-500">{yard.code}</p>
+                              </div>
                             </div>
-                            <div>
-                              <h5 className="font-semibold text-gray-800">{yard.name}</h5>
-                              <p className="text-sm text-gray-500">{yard.code}</p>
-                            </div>
-                          </div>
 
                           <div className="grid grid-cols-7 gap-1 mb-3">
                             {Array.from({ length: 7 }, (_, i) => {
@@ -1337,17 +1347,17 @@ export default function DashboardPage() {
                               return (
                                 <div key={i} className="space-y-1">
                                   {hasDelivery && (
-                                    <div className="bg-green-500 text-white text-xs font-medium px-1 py-1 rounded text-center">
+                                    <div className="bg-green-500 text-white text-xs font-medium px-1 py-1 rounded-xl text-center">
                                       +{Math.round(deliveryWeight)}t
                                     </div>
                                   )}
                                   {hasPickup && (
-                                    <div className="bg-red-500 text-white text-xs font-medium px-1 py-1 rounded text-center">
+                                    <div className="bg-red-500 text-white text-xs font-medium px-1 py-1 rounded-xl text-center">
                                       -{Math.round(pickupWeight)}t
                                     </div>
                                   )}
                                   {!hasDelivery && !hasPickup && (
-                                    <div className="bg-gray-200 text-gray-400 text-xs font-medium px-1 py-1 rounded text-center h-6 flex items-center justify-center">
+                                    <div className="bg-gray-200 text-gray-400 text-xs font-medium px-1 py-1 rounded-xl text-center h-6 flex items-center justify-center">
                                       —
                                     </div>
                                   )}
@@ -1386,12 +1396,12 @@ export default function DashboardPage() {
         </Card>
 
         {/* Deliveries and Pickups Tables */}
-        <Card className="bg-white shadow-lg rounded-2xl">
+        <Card className="bg-white rounded-[32px]">
           <CardContent className="p-6">
             <div className="flex space-x-8 mb-6">
               <button
                 onClick={() => setActiveTab("deliveries")}
-                className={`text-3xl pb-1 transition-all ${
+                className={`text-xl pb-1 transition-all ${
                   activeTab === "deliveries"
                     ? "font-bold text-gray-800 border-b-2 border-gray-800"
                     : "font-light text-gray-500 hover:text-gray-700"
@@ -1401,7 +1411,7 @@ export default function DashboardPage() {
               </button>
               <button
                 onClick={() => setActiveTab("pickups")}
-                className={`text-3xl pb-1 transition-all ${
+                className={`text-xl pb-1 transition-all ${
                   activeTab === "pickups"
                     ? "font-bold text-gray-800 border-b-2 border-gray-800"
                     : "font-light text-gray-500 hover:text-gray-700"
@@ -1441,24 +1451,24 @@ export default function DashboardPage() {
                         <div className="bg-gray-100 p-2 rounded-lg">
                           <Calendar1 size={20} className="text-gray-700" />
                         </div>
-                        <h3 className="text-xl font-bold text-gray-800">{date}</h3>
+                        <h3 className="text-md font-bold text-gray-800">{date}</h3>
                       </div>
 
                       <div className="space-y-3">
                         {deliveries.map((delivery: any) => {
                           const isExpanded = expandedContainers.has(delivery.id)
-                          return (
-                            <div key={delivery.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-                              <div
-                                className="flex items-center justify-between cursor-pointer"
-                                onClick={() => toggleContainer(delivery.id)}
-                              >
+                                                      return (
+                              <div key={delivery.id} className={`bg-white rounded-[24px] p-4 border ${isExpanded ? 'border-gray-600' : 'border-gray-100'}`}>
+                                <div
+                                  className="flex items-center justify-between cursor-pointer"
+                                  onClick={() => toggleContainer(delivery.id)}
+                                >
                                 <div className="flex items-center gap-4">
-                                  <div className="bg-gray-800 p-3 rounded-lg">
+                                  <div className="bg-gray-800 p-3 rounded-2xl">
                                     <Truck className="h-6 w-6 text-white" />
                                   </div>
                                   <div>
-                                    <p className="font-semibold text-gray-800 text-lg">
+                                    <p className="font-semibold text-gray-800 text-md">
                                       Weighbridge Number: {delivery.weighbridge_slip || delivery.id || "N/A"}
                                       {/* Edit indicator - will show when audit system is implemented */}
                                       {delivery.audit_logs && delivery.audit_logs.length > 0 && (
@@ -1474,7 +1484,7 @@ export default function DashboardPage() {
                                 </div>
                                 <div className="flex items-center gap-3">
                                   <div className="text-right">
-                                    <p className="text-2xl font-bold text-gray-800">{delivery.weight_tons?.toLocaleString()}t</p>
+                                    <p className="text-md font-bold text-gray-800">{delivery.weight_tons?.toLocaleString()}t</p>
                                   </div>
                                   <button
                                     onClick={(e) => {
@@ -1665,7 +1675,7 @@ export default function DashboardPage() {
                           const containerCount = pickup.pickup_containers?.length || 1
 
                           return (
-                            <div key={pickup.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                            <div key={pickup.id} className={`bg-white rounded-2xl p-4 border ${isExpanded ? 'border-gray-600' : 'border-gray-100'} shadow-sm`}>
                               <div
                                 className="flex items-center justify-between cursor-pointer"
                                 onClick={() => toggleContainer(pickup.id)}
