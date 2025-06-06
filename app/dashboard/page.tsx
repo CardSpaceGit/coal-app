@@ -1188,7 +1188,7 @@ export default function DashboardPage() {
                 <div className="mt-0">
                   {/* Current Stock Content */}
                   <div className="flex items-center justify-center mb-6">
-                    <div className="relative w-[400px] h-[400px]">
+                    <div className="relative w-[280px] h-[280px] md:w-[400px] md:h-[400px]">
                       <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                         <circle cx="50" cy="50" r="40" stroke="#e5e7eb" strokeWidth="8" fill="none" />
                         <circle
@@ -1203,8 +1203,8 @@ export default function DashboardPage() {
                         />
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <p className="text-md text-gray-600 mb-2">Total available stock</p>
-                        <p className="text-4xl font-bold text-gray-800">{stats?.totalStock.toLocaleString() || 0} t</p>
+                        <p className="text-sm md:text-md text-gray-600 mb-2">Total available stock</p>
+                        <p className="text-2xl md:text-4xl font-bold text-gray-800">{stats?.totalStock.toLocaleString() || 0} t</p>
                       </div>
                     </div>
                   </div>
@@ -1216,14 +1216,20 @@ export default function DashboardPage() {
                       <p className="text-2xl font-bold text-gray-800">
                         {stats?.totalDeliveryWeight.toLocaleString() || 0} t
                       </p>
-                      <p className="text-xs text-gray-500">Last updated: {new Date().toLocaleDateString()}</p>
+                      <p className="text-xs text-gray-500 md:inline block">
+                        <span className="md:inline block">Last updated:</span>
+                        <span className="md:inline block md:ml-1">{new Date().toLocaleDateString()}</span>
+                      </p>
                     </div>
                     <div className="text-center">
                       <p className="text-sm text-gray-600 mb-1">Total Pickups</p>
                       <p className="text-2xl font-bold text-gray-800">
                         {stats?.totalPickupWeight.toLocaleString() || 0} t
                       </p>
-                      <p className="text-xs text-gray-500">Last updated: {new Date().toLocaleDateString()}</p>
+                      <p className="text-xs text-gray-500 md:inline block">
+                        <span className="md:inline block">Last updated:</span>
+                        <span className="md:inline block md:ml-1">{new Date().toLocaleDateString()}</span>
+                      </p>
                     </div>
                   </div>
 
@@ -1369,22 +1375,67 @@ export default function DashboardPage() {
                               </div>
                             </div>
 
-                          <div className="grid grid-cols-7 gap-1 mb-3">
-                            {Array.from({ length: 7 }, (_, i) => {
-                              const date = new Date(dateRange.start)
-                              date.setDate(date.getDate() + i)
-                              return (
-                                <div key={i} className="text-center">
-                                  <div className="text-xs text-gray-500 mb-1">
-                                    {date.toLocaleDateString("en-US", { weekday: "short" })}
+                          {/* Desktop Grid Layout */}
+                          <div className="hidden md:block">
+                            <div className="grid grid-cols-7 gap-1 mb-3">
+                              {Array.from({ length: 7 }, (_, i) => {
+                                const date = new Date(dateRange.start)
+                                date.setDate(date.getDate() + i)
+                                return (
+                                  <div key={i} className="text-center">
+                                    <div className="text-xs text-gray-500 mb-1">
+                                      {date.toLocaleDateString("en-US", { weekday: "short" })}
+                                    </div>
+                                    <div className="text-xs font-medium text-gray-600">{date.getDate()}</div>
                                   </div>
-                                  <div className="text-xs font-medium text-gray-600">{date.getDate()}</div>
-                                </div>
-                              )
-                            })}
+                                )
+                              })}
+                            </div>
+
+                            <div className="grid grid-cols-7 gap-1">
+                              {Array.from({ length: 7 }, (_, i) => {
+                                const date = new Date(dateRange.start)
+                                date.setDate(date.getDate() + i)
+                                const dateString = date.toISOString().split("T")[0]
+
+                                // Get deliveries for this date
+                                const dayDeliveries = yardActivity.deliveries.filter(
+                                  (d) => d.delivery_date === dateString,
+                                )
+                                const deliveryWeight = dayDeliveries.reduce((sum, d) => sum + Number(d.weight_tons), 0)
+
+                                // Get pickups for this date
+                                const dayPickups = yardActivity.pickups.filter((p) => p.pickup_date === dateString)
+                                const pickupWeight = dayPickups.reduce((sum, p) => sum + Number(p.weight_tons), 0)
+
+                                const hasDelivery = deliveryWeight > 0
+                                const hasPickup = pickupWeight > 0
+
+                                return (
+                                  <div key={i} className="flex flex-col space-y-1">
+                                    {hasDelivery && (
+                                      <div className="bg-green-500 text-white text-xs font-medium px-1 py-1 rounded-xl text-center min-h-[24px] flex items-center justify-center">
+                                        <span className="block">+{Math.round(deliveryWeight)}t</span>
+                                      </div>
+                                    )}
+                                    {hasPickup && (
+                                      <div className="bg-red-500 text-white text-xs font-medium px-1 py-1 rounded-xl text-center min-h-[24px] flex items-center justify-center">
+                                        <span className="block">-{Math.round(pickupWeight)}t</span>
+                                      </div>
+                                    )}
+                                    {!hasDelivery && !hasPickup && (
+                                      <div className="bg-gray-200 text-gray-400 text-xs font-medium px-1 py-1 rounded-xl text-center h-6 flex items-center justify-center">
+                                        —
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
                           </div>
 
-                          <div className="grid grid-cols-7 gap-1">
+                          {/* Mobile Vertical Layout */}
+                          <div className="md:hidden space-y-3">
                             {Array.from({ length: 7 }, (_, i) => {
                               const date = new Date(dateRange.start)
                               date.setDate(date.getDate() + i)
@@ -1402,24 +1453,35 @@ export default function DashboardPage() {
 
                               const hasDelivery = deliveryWeight > 0
                               const hasPickup = pickupWeight > 0
+                              const hasActivity = hasDelivery || hasPickup
 
                               return (
-                                <div key={i} className="space-y-1">
-                                  {hasDelivery && (
-                                    <div className="bg-green-500 text-white text-xs font-medium px-1 py-1 rounded-xl text-center">
-                                      +{Math.round(deliveryWeight)}t
+                                <div key={i} className={`rounded-xl p-3 border ${hasActivity ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-100'}`}>
+                                  {/* Date Header */}
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <div className={`text-sm font-semibold ${hasActivity ? 'text-gray-800' : 'text-gray-500'}`}>
+                                      {date.toLocaleDateString("en-US", { weekday: "short" })} {date.getDate()}
                                     </div>
-                                  )}
-                                  {hasPickup && (
-                                    <div className="bg-red-500 text-white text-xs font-medium px-1 py-1 rounded-xl text-center">
-                                      -{Math.round(pickupWeight)}t
-                                    </div>
-                                  )}
-                                  {!hasDelivery && !hasPickup && (
-                                    <div className="bg-gray-200 text-gray-400 text-xs font-medium px-1 py-1 rounded-xl text-center h-6 flex items-center justify-center">
-                                      —
-                                    </div>
-                                  )}
+                                  </div>
+
+                                  {/* Activity Indicators */}
+                                  <div className="space-y-2">
+                                    {hasDelivery && (
+                                      <div className="bg-green-500 text-white text-sm font-medium px-3 py-2 rounded-lg w-full text-center">
+                                        <span>Delivery: +{Math.round(deliveryWeight)}t</span>
+                                      </div>
+                                    )}
+                                    {hasPickup && (
+                                      <div className="bg-red-500 text-white text-sm font-medium px-3 py-2 rounded-lg w-full text-center">
+                                        <span>Pickup: -{Math.round(pickupWeight)}t</span>
+                                      </div>
+                                    )}
+                                    {!hasActivity && (
+                                      <div className="bg-gray-200 text-gray-500 text-sm font-medium px-3 py-2 rounded-lg w-full text-center">
+                                        No activity
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               )
                             })}
@@ -1457,7 +1519,7 @@ export default function DashboardPage() {
         {/* Deliveries and Pickups Tables */}
         <Card className="bg-white rounded-[32px]">
           <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
               <div className="flex space-x-8">
                 <button
                   onClick={() => setActiveTab("deliveries")}
@@ -1482,13 +1544,13 @@ export default function DashboardPage() {
               </div>
               
               {/* Search Input */}
-              <div className="relative">
+              <div className="relative w-full md:w-auto">
                 <Input
                   type="text"
                   placeholder="Search by container, weighbridge, or product..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-80 pl-4 pr-4 py-2 rounded-full border-2 border-gray-200 focus:border-yellow-500 focus:ring-0"
+                  className="w-full md:w-80 pl-4 pr-4 py-2 rounded-full border-2 border-gray-200 focus:border-yellow-500 focus:ring-0"
                 />
                 {searchTerm && (
                   <button
@@ -1973,13 +2035,13 @@ export default function DashboardPage() {
       </div>
 
               {/* Floating Action Button */}
-        <div className="fixed bottom-12 right-12">
+        <div className="fixed bottom-4 right-4 md:bottom-12 md:right-12 z-50">
           <Button
             size="lg"
-            className="h-20 w-20 rounded-full bg-yellow-500 hover:bg-yellow-600 text-gray-800 shadow-lg"
+            className="h-16 w-16 md:h-20 md:w-20 rounded-full bg-yellow-500 hover:bg-yellow-600 text-gray-800 shadow-lg"
             onClick={() => setShowAddModal(true)}
           >
-            <Plus className="!h-8 !w-8" style={{ width: '32px', height: '32px' }} />
+            <Plus className="!h-6 !w-6 md:!h-8 md:!w-8" style={{ width: '24px', height: '24px' }} />
           </Button>
         </div>
 
