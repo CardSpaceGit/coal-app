@@ -941,9 +941,7 @@ export default function DashboardPage() {
                 </span>
               </div>
               {/* Debugging info */}
-              <div className="text-xs text-gray-400">
-                Debug: user.role = {JSON.stringify(user.role)}
-              </div>
+
             </div>
           </div>
         </div>
