@@ -2,6 +2,7 @@
 
 // Inspired by react-hot-toast library
 import * as React from "react"
+import { useState } from "react"
 
 import type {
   ToastActionElement,
@@ -189,6 +190,30 @@ function useToast() {
     toast,
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
   }
+}
+
+export interface Toast {
+  title: string
+  description?: string
+  variant?: "default" | "destructive"
+}
+
+export function useToast() {
+  const [toasts, setToasts] = useState<Toast[]>([])
+
+  const toast = (newToast: Toast) => {
+    console.log(`Toast: ${newToast.title}`, newToast.description)
+    
+    // In a real implementation, you'd show an actual toast
+    // For now, we'll just log to console and show an alert for errors
+    if (newToast.variant === "destructive") {
+      alert(`Error: ${newToast.title}\n${newToast.description || ''}`)
+    } else {
+      alert(`Success: ${newToast.title}\n${newToast.description || ''}`)
+    }
+  }
+
+  return { toast, toasts }
 }
 
 export { useToast, toast }

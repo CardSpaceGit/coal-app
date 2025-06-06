@@ -12,8 +12,8 @@ export interface Role {
   name: string
   description?: string
   permissions: string[]
-  organization_id: string
   created_at: string
+  updated_at: string
 }
 
 export interface OrganizationUser {
@@ -107,9 +107,8 @@ export interface Stock {
 export interface SuperAdmin {
   id: string
   user_id: string
-  full_name: string
-  email: string
   is_active: boolean
+  permissions: string[]
   created_at: string
   updated_at: string
 }

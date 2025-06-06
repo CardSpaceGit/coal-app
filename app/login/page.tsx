@@ -49,14 +49,13 @@ export default function LoginPage() {
         }
 
         // Check if user is linked to an organization
-        const { data: orgUser } = await supabase
+        const { data: orgUsers } = await supabase
           .from("organization_users")
           .select("*")
           .eq("user_id", data.user.id)
           .eq("is_active", true)
-          .single()
 
-        if (!orgUser) {
+        if (!orgUsers || orgUsers.length === 0) {
           setError("Your account is not linked to an organization. Please contact your administrator.")
           await supabase.auth.signOut()
           return

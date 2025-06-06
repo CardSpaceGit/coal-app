@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Menu, Plus, ChevronDown } from "lucide-react"
+import { Menu, Plus, ChevronDown, Search } from "lucide-react"
 import { Calendar1, Weight, Box, Edit, DocumentDownload, DocumentText, Archive, Refresh, MoreSquare, Setting4, CloseSquare, Trash, ArrowRight } from "iconsax-reactjs"
 import { getSupabaseClient } from "@/lib/supabase"
 import { useAuth } from "@/hooks/useAuth"
@@ -64,6 +64,22 @@ export default function DashboardPage() {
   const [loadingGrokSummary, setLoadingGrokSummary] = useState(false)
   const [loadingExport, setLoadingExport] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
+  
+  // Toast notification state
+  const [toast, setToast] = useState<{
+    show: boolean
+    message: string
+    type: 'success' | 'error'
+  }>({ show: false, message: '', type: 'success' })
+
+  // Toast notification function
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, message, type })
+    // Auto-dismiss after 4 seconds
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }))
+    }, 4000)
+  }
 
   // Add this near the top of the component, after the existing useEffect
   // useEffect(() => {
@@ -798,6 +814,12 @@ export default function DashboardPage() {
       setShowDeleteModal(false)
       setSelectedRecord(null)
       
+      // Show success toast
+      showToast(
+        `${recordType === 'delivery' ? 'Delivery' : 'Pickup'} record deleted successfully`,
+        'success'
+      )
+      
       // Reload all dashboard data
       await Promise.all([
         loadDashboardData(),
@@ -807,7 +829,10 @@ export default function DashboardPage() {
 
     } catch (error) {
       console.error("Error deleting record:", error)
-      alert(`Error: ${(error as any)?.message || "Failed to delete record"}`)
+      showToast(
+        `Failed to delete ${recordType} record: ${(error as any)?.message || "Unknown error"}`,
+        'error'
+      )
     } finally {
       setLoading(false)
     }
@@ -907,9 +932,18 @@ export default function DashboardPage() {
               Hi <span className="font-bold">{user.full_name}</span>,{" "}
               <span className="italic">here's what's happening.</span>
             </h1>
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex flex-col gap-1 mt-2">
               <span className="text-sm text-gray-300">{user.organization?.name}</span>
-              <span className="text-xs bg-yellow-500 text-gray-900 px-3 py-1 rounded-full font-medium">{user.role?.name}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">Role:</span>
+                <span className="text-xs bg-yellow-500 text-gray-900 px-3 py-1 rounded-full font-medium">
+                  {user.role?.name || 'No Role Assigned'}
+                </span>
+              </div>
+              {/* Debugging info */}
+              <div className="text-xs text-gray-400">
+                Debug: user.role = {JSON.stringify(user.role)}
+              </div>
             </div>
           </div>
         </div>
@@ -1545,12 +1579,13 @@ export default function DashboardPage() {
               
               {/* Search Input */}
               <div className="relative w-full md:w-auto">
+                <Search size={20} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <Input
                   type="text"
                   placeholder="Search by container, weighbridge, or product..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full md:w-80 pl-4 pr-4 py-2 rounded-full border-2 border-gray-200 focus:border-yellow-500 focus:ring-0"
+                  className="w-full md:w-96 pl-12 pr-10 py-2 rounded-full border-2 border-gray-200 focus:border-yellow-500 focus:ring-0"
                 />
                 {searchTerm && (
                   <button
@@ -1602,54 +1637,111 @@ export default function DashboardPage() {
                                                       return (
                               <div key={delivery.id} className={`bg-white rounded-[24px] p-4 border transition-all ${isExpanded ? 'border-gray-600' : 'border-gray-100 hover:bg-gray-50 hover:border-gray-300'}`}>
                                 <div
-                                  className="flex items-center justify-between cursor-pointer"
+                                  className="cursor-pointer"
                                   onClick={() => toggleContainer(delivery.id)}
                                 >
-                                <div className="flex items-center gap-4">
-                                  <div className="rounded-2xl">
-                                    <Image
-                                      src="/delivery.jpg"
-                                      alt="Delivery"
-                                      width={24}
-                                      height={24}
-                                      className="w-12 h-12 object-cover rounded-[24px]"
-                                    />
+                                  {/* Mobile Layout */}
+                                  <div className="md:hidden">
+                                    <div className="flex items-start justify-between mb-3">
+                                      <div className="flex items-center gap-3">
+                                        <Image
+                                          src="/delivery.jpg"
+                                          alt="Delivery"
+                                          width={24}
+                                          height={24}
+                                          className="w-10 h-10 object-cover rounded-[20px] flex-shrink-0"
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                          <p className="font-semibold text-gray-800 text-sm">
+                                            Weighbridge #:
+                                          </p>
+                                          <p className="text-gray-800 text-sm font-medium truncate">
+                                            {delivery.weighbridge_slip || delivery.id || "N/A"}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2 flex-shrink-0">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setSelectedRecord(delivery)
+                                            setRecordType('delivery')
+                                            setShowDropdownModal(true)
+                                          }}
+                                          className="p-1.5 hover:bg-gray-100 rounded-lg"
+                                        >
+                                          <MoreSquare size={18} className="text-gray-500" />
+                                        </button>
+                                        <ChevronDown
+                                          className={`h-4 w-4 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <p className="text-gray-600 text-sm">
+                                          {delivery.product?.name || "Mixed Products"}
+                                        </p>
+                                        {delivery.audit_logs && delivery.audit_logs.length > 0 && (
+                                          <span className="inline-flex items-center bg-blue-100 px-2 py-1 rounded-full mt-1">
+                                            <span className="text-xs font-medium text-blue-600">Edited</span>
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-md font-bold text-gray-800">{delivery.weight_tons?.toLocaleString()}t</p>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <p className="font-semibold text-gray-800 text-md">
-                                      Weighbridge Number: {delivery.weighbridge_slip || delivery.id || "N/A"}
-                                      {/* Edit indicator - will show when audit system is implemented */}
-                                      {delivery.audit_logs && delivery.audit_logs.length > 0 && (
-                                        <span className="ml-2 inline-flex items-center bg-blue-100 px-2 py-1 rounded-full">
-                                          <span className="text-xs font-medium text-blue-600">Edited</span>
-                                        </span>
-                                      )}
-                                    </p>
-                                    <p className="text-gray-600 text-sm mt-1">
-                                      {delivery.product?.name || "Mixed Products"}
-                                    </p>
+
+                                  {/* Desktop Layout */}
+                                  <div className="hidden md:flex md:items-center md:justify-between">
+                                    <div className="flex items-center gap-4">
+                                      <div className="rounded-2xl">
+                                        <Image
+                                          src="/delivery.jpg"
+                                          alt="Delivery"
+                                          width={24}
+                                          height={24}
+                                          className="w-12 h-12 object-cover rounded-[24px]"
+                                        />
+                                      </div>
+                                      <div>
+                                        <p className="font-semibold text-gray-800 text-md">
+                                          Weighbridge Number: {delivery.weighbridge_slip || delivery.id || "N/A"}
+                                          {/* Edit indicator - will show when audit system is implemented */}
+                                          {delivery.audit_logs && delivery.audit_logs.length > 0 && (
+                                            <span className="ml-2 inline-flex items-center bg-blue-100 px-2 py-1 rounded-full">
+                                              <span className="text-xs font-medium text-blue-600">Edited</span>
+                                            </span>
+                                          )}
+                                        </p>
+                                        <p className="text-gray-600 text-sm mt-1">
+                                          {delivery.product?.name || "Mixed Products"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <div className="text-right">
+                                        <p className="text-md font-bold text-gray-800">{delivery.weight_tons?.toLocaleString()}t</p>
+                                      </div>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setSelectedRecord(delivery)
+                                          setRecordType('delivery')
+                                          setShowDropdownModal(true)
+                                        }}
+                                        className="p-2 hover:bg-gray-100 rounded-lg"
+                                      >
+                                        <MoreSquare size={20} className="text-gray-500" />
+                                      </button>
+                                      <ChevronDown
+                                        className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                      />
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                  <div className="text-right">
-                                    <p className="text-md font-bold text-gray-800">{delivery.weight_tons?.toLocaleString()}t</p>
-                                  </div>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setSelectedRecord(delivery)
-                                      setRecordType('delivery')
-                                      setShowDropdownModal(true)
-                                    }}
-                                    className="p-2 hover:bg-gray-100 rounded-lg"
-                                  >
-                                    <MoreSquare size={20} className="text-gray-500" />
-                                  </button>
-                                  <ChevronDown
-                                    className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                                  />
-                                </div>
-                              </div>
 
                               {isExpanded && (
                                 <div className="mt-4 pt-4 border-t border-gray-200">
@@ -1668,7 +1760,7 @@ export default function DashboardPage() {
                                           />
                                         </div>
                                         <div>
-                                          <p className="font-semibold text-gray-800">{delivery.product?.name}</p>
+                                          <p className="font-semibold text-gray-800">{delivery.product?.name || "Product Name Unavailable"}</p>
                                           <p className="text-sm text-gray-500">Stockpile 1</p>
                                         </div>
                                       </div>
@@ -1729,6 +1821,26 @@ export default function DashboardPage() {
                                                   // Skip complex objects like containers
                                                   if (typeof oldValue === 'object' || typeof newValue === 'object') {
                                                     return null
+                                                  }
+                                                  
+                                                  // Special handling for product_id - show product names instead of IDs
+                                                  if (field === 'product_id') {
+                                                    const oldProduct = allProducts.find(p => p.id === oldValue)
+                                                    const newProduct = allProducts.find(p => p.id === newValue)
+                                                    return (
+                                                      <div key={field} className="flex items-center gap-2">
+                                                        <span className="font-medium text-gray-600 capitalize">
+                                                          Product Type:
+                                                        </span>
+                                                        <span className="text-red-600 line-through">
+                                                          {oldProduct?.name || 'Unknown Product'}
+                                                        </span>
+                                                        <span className="text-gray-400">→</span>
+                                                        <span className="text-green-600 font-medium">
+                                                          {newProduct?.name || 'Unknown Product'}
+                                                        </span>
+                                                      </div>
+                                                    )
                                                   }
                                                   
                                                   return (
@@ -1823,52 +1935,109 @@ export default function DashboardPage() {
                           return (
                             <div key={pickup.id} className={`bg-white rounded-[24px] p-4 border transition-all ${isExpanded ? 'border-gray-600' : 'border-gray-100 hover:bg-gray-50 hover:border-gray-300'}`}>
                               <div
-                                className="flex items-center justify-between cursor-pointer"
+                                className="cursor-pointer"
                                 onClick={() => toggleContainer(pickup.id)}
                               >
-                                <div className="flex items-center gap-4">
-                                  <div className="rounded-2xl">
-                                    <Image
-                                      src="/pickups.jpg"
-                                      alt="Pickup"
-                                      width={24}
-                                      height={24}
-                                      className="w-12 h-12 object-cover rounded-[24px]"
-                                    />
+                                {/* Mobile Layout */}
+                                <div className="md:hidden">
+                                  <div className="flex items-start justify-between mb-3">
+                                    <div className="flex items-center gap-3">
+                                      <Image
+                                        src="/pickups.jpg"
+                                        alt="Pickup"
+                                        width={24}
+                                        height={24}
+                                        className="w-10 h-10 object-cover rounded-[20px] flex-shrink-0"
+                                      />
+                                      <div className="min-w-0 flex-1">
+                                        <p className="font-semibold text-gray-800 text-sm">
+                                          Container SARU:
+                                        </p>
+                                        <p className="text-gray-800 text-sm font-medium truncate">
+                                          {pickup.container_number || pickup.weighbridge_slip || pickup.id || "N/A"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setSelectedRecord(pickup)
+                                          setRecordType('pickup')
+                                          setShowDropdownModal(true)
+                                        }}
+                                        className="p-1.5 hover:bg-gray-100 rounded-lg"
+                                      >
+                                        <MoreSquare size={18} className="text-gray-500" />
+                                      </button>
+                                      <ChevronDown
+                                        className={`h-4 w-4 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                      />
+                                    </div>
                                   </div>
-                                  <div>
-                                    <p className="font-semibold text-gray-800 text-md">
-                                      Container SARU | {pickup.container_number || pickup.weighbridge_slip || pickup.id || "N/A"}
-                                      {/* Edit indicator - will show when audit system is implemented */}
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <p className="text-gray-600 text-sm">
+                                        {pickup.product?.name || "Mixed Products"}
+                                      </p>
                                       {pickup.audit_logs && pickup.audit_logs.length > 0 && (
-                                        <span className="ml-2 inline-flex items-center bg-blue-100 px-2 py-1 rounded-full">
+                                        <span className="inline-flex items-center bg-blue-100 px-2 py-1 rounded-full mt-1">
                                           <span className="text-xs font-medium text-blue-600">Edited</span>
                                         </span>
                                       )}
-                                    </p>
-                                    <p className="text-gray-600 text-sm mt-1">
-                                      {pickup.product?.name || "Mixed Products"}
-                                    </p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-md font-bold text-gray-800">{totalWeight?.toLocaleString()}t</p>
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                  <div className="text-right">
-                                    <p className="text-md font-bold text-gray-800">{totalWeight?.toLocaleString()}t</p>
+
+                                {/* Desktop Layout */}
+                                <div className="hidden md:flex md:items-center md:justify-between">
+                                  <div className="flex items-center gap-4">
+                                    <div className="rounded-2xl">
+                                      <Image
+                                        src="/pickups.jpg"
+                                        alt="Pickup"
+                                        width={24}
+                                        height={24}
+                                        className="w-12 h-12 object-cover rounded-[24px]"
+                                      />
+                                    </div>
+                                    <div>
+                                      <p className="font-semibold text-gray-800 text-md">
+                                        Container SARU | {pickup.container_number || pickup.weighbridge_slip || pickup.id || "N/A"}
+                                        {/* Edit indicator - will show when audit system is implemented */}
+                                        {pickup.audit_logs && pickup.audit_logs.length > 0 && (
+                                          <span className="ml-2 inline-flex items-center bg-blue-100 px-2 py-1 rounded-full">
+                                            <span className="text-xs font-medium text-blue-600">Edited</span>
+                                          </span>
+                                        )}
+                                      </p>
+                                      <p className="text-gray-600 text-sm mt-1">
+                                        {pickup.product?.name || "Mixed Products"}
+                                      </p>
+                                    </div>
                                   </div>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setSelectedRecord(pickup)
-                                      setRecordType('pickup')
-                                      setShowDropdownModal(true)
-                                    }}
-                                    className="p-2 hover:bg-gray-100 rounded-lg"
-                                  >
-                                    <MoreSquare size={20} className="text-gray-500" />
-                                  </button>
-                                  <ChevronDown
-                                    className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                                  />
+                                  <div className="flex items-center gap-3">
+                                    <div className="text-right">
+                                      <p className="text-md font-bold text-gray-800">{totalWeight?.toLocaleString()}t</p>
+                                    </div>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setSelectedRecord(pickup)
+                                        setRecordType('pickup')
+                                        setShowDropdownModal(true)
+                                      }}
+                                      className="p-2 hover:bg-gray-100 rounded-lg"
+                                    >
+                                      <MoreSquare size={20} className="text-gray-500" />
+                                    </button>
+                                    <ChevronDown
+                                      className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                    />
+                                  </div>
                                 </div>
                               </div>
 
@@ -2257,15 +2426,15 @@ export default function DashboardPage() {
       <Dialog open={showDropdownModal} onOpenChange={setShowDropdownModal}>
         <DialogContent className="!fixed !inset-x-0 !bottom-0 !top-auto !left-0 !right-0 !transform-none !translate-x-0 !translate-y-0 mx-0 max-w-none !w-screen h-auto max-h-[50vh] rounded-t-3xl !rounded-b-none border-0 p-0 m-0 animate-slide-in-from-bottom-full data-[state=closed]:animate-slide-out-to-bottom-full [&>button]:hidden">
           <div className="flex flex-col w-full">
-            <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
-              <DialogTitle className="text-xl font-bold text-gray-800">
+            <DialogHeader className="flex-shrink-0 px-4 sm:px-6 py-4 sm:py-6 pb-3 sm:pb-4 border-b border-gray-200">
+              <DialogTitle className="text-lg sm:text-xl font-bold text-gray-800 text-center">
                 {recordType === 'delivery' ? 'Delivery' : 'Pickup'} Options
               </DialogTitle>
-              <DialogDescription className="text-gray-600">
+              <DialogDescription className="text-sm sm:text-base text-gray-600 text-center mt-1">
                 Choose an action to perform on this {recordType} record
               </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 p-6 space-y-4">
+            <div className="flex-1 px-4 sm:px-6 py-4 sm:py-6 space-y-3 sm:space-y-4">
               <Button
                 onClick={() => {
                   setShowDropdownModal(false)
@@ -2276,15 +2445,15 @@ export default function DashboardPage() {
                   }
                 }}
                 variant="outline"
-                className="w-full h-16 rounded-[24px] justify-start text-left"
+                className="w-full h-14 sm:h-16 rounded-[24px] sm:rounded-[24px] justify-start text-left hover:bg-gray-50 active:bg-gray-100 transition-colors"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-[24px] flex items-center justify-center">
-                    <Edit size={24} className="text-gray-600 rounded-[24px]" />
+                <div className="flex items-center gap-3 sm:gap-4 w-full">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-xl sm:rounded-[24px] flex items-center justify-center flex-shrink-0">
+                    <Edit size={20} className="sm:size-6 text-gray-600" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-800">Edit record</h3>
-                    <p className="text-sm text-gray-500">Modify this {recordType} record</p>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-800 text-base sm:text-lg truncate">Edit record</h3>
+                    <p className="text-xs sm:text-sm text-gray-500 truncate">Modify this {recordType} record</p>
                   </div>
                 </div>
               </Button>
@@ -2295,15 +2464,15 @@ export default function DashboardPage() {
                   setShowDeleteModal(true)
                 }}
                 variant="outline"
-                className="w-full h-16 rounded-[24px] justify-start text-left border-red-200 hover:border-red-300 hover:bg-red-50"
+                className="w-full h-14 sm:h-16 rounded-[24px] sm:rounded-[24px] justify-start text-left border-red-200 hover:border-red-300 hover:bg-red-50 active:bg-red-100 transition-colors"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-red-100 rounded-[24px] flex items-center justify-center">
-                    <Trash size={24} className="text-red-600 rounded-[24px]" />
+                <div className="flex items-center gap-3 sm:gap-4 w-full">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 rounded-xl sm:rounded-[24px] flex items-center justify-center flex-shrink-0">
+                    <Trash size={20} className="sm:size-6 text-red-600" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-red-600">Delete record</h3>
-                    <p className="text-sm text-red-500">Permanently remove this {recordType} record</p>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-red-600 text-base sm:text-lg truncate">Delete record</h3>
+                    <p className="text-xs sm:text-sm text-red-500 truncate">Permanently remove this {recordType} record</p>
                   </div>
                 </div>
               </Button>
@@ -2311,6 +2480,40 @@ export default function DashboardPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className="fixed top-4 left-4 right-4 z-[100] flex justify-center">
+          <div
+            className={`flex items-center gap-3 p-4 rounded-[20px] shadow-lg transition-all duration-300 ease-in-out w-full max-w-sm ${
+              toast.type === 'success'
+                ? 'bg-green-500 text-white'
+                : 'bg-red-500 text-white'
+            } ${toast.show ? 'animate-slide-in-from-top' : 'animate-slide-out-to-top'}`}
+          >
+            <div className="flex-shrink-0">
+              {toast.type === 'success' ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+            <p className="text-sm font-medium flex-1">{toast.message}</p>
+            <button
+              onClick={() => setToast(prev => ({ ...prev, show: false }))}
+              className="flex-shrink-0 ml-2 hover:opacity-75 transition-opacity"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
