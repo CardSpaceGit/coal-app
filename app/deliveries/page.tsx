@@ -42,6 +42,7 @@ export default function DeliveriesPage() {
     },
   ])
   const [loading, setLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [currentStock, setCurrentStock] = useState(0)
   const [yardStockData, setYardStockData] = useState<Record<string, Array<{productName: string, stock: number}>>>({})
   const [showStockModal, setShowStockModal] = useState(false)
@@ -62,6 +63,7 @@ export default function DeliveriesPage() {
 
   const loadData = async () => {
     try {
+      setInitialLoading(true)
       console.log("🔍 Deliveries: Starting loadData...")
       const {
         data: { session },
@@ -88,39 +90,27 @@ export default function DeliveriesPage() {
 
       console.log("✅ Deliveries: User data:", userData)
 
-      // Get organization details to access coal_yard_names
+      // OPTIMIZED: Get both coal_yard_names and product_names in single query
       const { data: orgData } = await supabase
         .from("organizations")
-        .select("coal_yard_names")
+        .select("coal_yard_names, product_names")
         .eq("id", (userData as any).organization_id)
         .single()
 
-      if (!orgData?.coal_yard_names) {
-        console.error("❌ Deliveries: Organization coal yard names not found")
+      if (!orgData?.coal_yard_names || !orgData?.product_names) {
+        console.error("❌ Deliveries: Organization names not found")
         return
       }
 
-      console.log("✅ Deliveries: Organization coal yard names:", orgData.coal_yard_names)
+      console.log("✅ Deliveries: Organization data:", orgData)
 
-      // Get organization details to access product_names
-      const { data: orgData2 } = await supabase
-        .from("organizations")
-        .select("product_names")
-        .eq("id", (userData as any).organization_id)
-        .single()
-
-      if (!orgData2?.product_names) {
-        console.error("❌ Deliveries: Organization product names not found")
-        return
-      }
-
-      // Load products and yards in a single optimized query
+      // OPTIMIZED: Load critical data first (products and yards only)
       const [productsResult, allYardsResult] = await Promise.all([
         // Get products for this organization based on product_names array
         supabase
           .from("products")
           .select("*")
-          .in("name", orgData2.product_names as string[])
+          .in("name", orgData.product_names as string[])
           .order("name"),
         
         // Get yards for this organization based on coal_yard_names array
@@ -131,9 +121,9 @@ export default function DeliveriesPage() {
           .order("name")
       ])
 
-      console.log("✅ Deliveries: Products result:", productsResult)
-      console.log("✅ Deliveries: Yards result:", allYardsResult)
+      console.log("✅ Deliveries: Core data loaded")
 
+      // Set products and yards immediately for faster UI response
       if (productsResult.data) setProducts(productsResult.data as unknown as Product[])
       
       if (allYardsResult.data && allYardsResult.data.length > 0) {
@@ -146,20 +136,30 @@ export default function DeliveriesPage() {
           prev.map((delivery, index) => (index === 0 ? { ...delivery, yardId: yards[0].id } : delivery)),
         )
         setSelectedYard(yards[0].id)
-        loadCurrentStock(yards[0].id)
+        
+        // Core data loaded - hide loading state
+        setInitialLoading(false)
+        
+        // Load stock data in background (non-blocking)
+        if (productsResult.data) {
+          const products = productsResult.data as unknown as Product[]
+          
+          // Load essential stock for selected yard first
+          loadCurrentStock(yards[0].id)
+          
+          // Load comprehensive stock data in background
+          setTimeout(() => {
+            loadAllYardStockOptimized(yards, products, (userData as any).organization_id)
+            loadAllStockOverview(yards, products, (userData as any).organization_id)
+          }, 100) // Small delay to let UI render first
+        }
       } else {
         console.log("❌ Deliveries: No yards data found or empty array")
-      }
-
-      // Load stock data for all yards efficiently
-      if (allYardsResult.data && allYardsResult.data.length > 0 && productsResult.data) {
-        const yards = allYardsResult.data as unknown as CoalYard[]
-        const products = productsResult.data as unknown as Product[]
-        loadAllYardStockOptimized(yards, products, (userData as any).organization_id)
-        loadAllStockOverview(yards, products, (userData as any).organization_id)
+        setInitialLoading(false)
       }
     } catch (error) {
       console.error("❌ Deliveries: Error loading data:", error)
+      setInitialLoading(false)
     }
   }
 
@@ -410,6 +410,41 @@ export default function DeliveriesPage() {
   }
 
   const selectedYardData = coalYards.find((y) => y.id === selectedYard)
+
+  // Show loading state while data is being fetched
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" className="rounded-full" size="icon" onClick={() => router.back()}>
+              <ArrowLeft className="h-6 w-6" />
+            </Button>
+            <h1 className="text-2xl font-bold">Add Deliveries</h1>
+            <Button variant="ghost" className="rounded-full" disabled>
+              <DocumentText size={56} />
+            </Button>
+          </div>
+        </div>
+
+        {/* Loading Content */}
+        <div className="p-4 space-y-6">
+          <Card className="rounded-[32px]">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading yards and products...</p>
+                  <p className="text-sm text-gray-500 mt-1">Please wait while we prepare your delivery form</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

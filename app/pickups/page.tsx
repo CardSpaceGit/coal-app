@@ -40,6 +40,7 @@ export default function PickupsPage() {
     },
   ])
   const [loading, setLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [outgoingLoad, setOutgoingLoad] = useState(0)
   const [showStockModal, setShowStockModal] = useState(false)
   const [allStockData, setAllStockData] = useState<Array<{productName: string, totalStock: number, yards: Array<{yardName: string, yardCode: string, stock: number}>}>>([])
@@ -300,6 +301,7 @@ export default function PickupsPage() {
 
   const loadData = async () => {
     try {
+      setInitialLoading(true)
       console.log("🔍 Starting loadData...")
       const {
         data: { session },
@@ -326,39 +328,27 @@ export default function PickupsPage() {
 
       console.log("✅ User data:", userData)
 
-      // Get organization details to access coal_yard_names
+      // OPTIMIZED: Get both coal_yard_names and product_names in single query
       const { data: orgData } = await supabase
         .from("organizations")
-        .select("coal_yard_names")
+        .select("coal_yard_names, product_names")
         .eq("id", (userData as any).organization_id)
         .single()
 
-      if (!orgData?.coal_yard_names) {
-        console.error("❌ Organization coal yard names not found")
+      if (!orgData?.coal_yard_names || !orgData?.product_names) {
+        console.error("❌ Organization names not found")
         return
       }
 
-      console.log("✅ Organization coal yard names:", orgData.coal_yard_names)
+      console.log("✅ Organization data:", orgData)
 
-      // Get organization details to access product_names
-      const { data: orgData2 } = await supabase
-        .from("organizations")
-        .select("product_names")
-        .eq("id", (userData as any).organization_id)
-        .single()
-
-      if (!orgData2?.product_names) {
-        console.error("❌ Organization product names not found")
-        return
-      }
-
-      // Load products and yards in a single optimized query
+      // OPTIMIZED: Load critical data first (products and yards only)
       const [productsResult, allYardsResult] = await Promise.all([
         // Get products for this organization based on product_names array
         supabase
           .from("products")
           .select("*")
-          .in("name", orgData2.product_names as string[])
+          .in("name", orgData.product_names as string[])
           .order("name"),
         
         // Get yards for this organization based on coal_yard_names array
@@ -369,9 +359,9 @@ export default function PickupsPage() {
           .order("name")
       ])
 
-      console.log("✅ Products result:", productsResult)
-      console.log("✅ Yards result:", allYardsResult)
+      console.log("✅ Core data loaded")
 
+      // Set products and yards immediately for faster UI response
       if (productsResult.data) setProducts(productsResult.data as unknown as Product[])
       
       if (allYardsResult.data && allYardsResult.data.length > 0) {
@@ -379,19 +369,33 @@ export default function PickupsPage() {
         setCoalYards(allYardsResult.data as unknown as CoalYard[])
 
         // Set default yard
-        setSelectedYard((allYardsResult.data[0] as unknown as CoalYard).id)
-        loadProductStock((allYardsResult.data[0] as unknown as CoalYard).id)
+        const firstYard = allYardsResult.data[0] as unknown as CoalYard
+        setSelectedYard(firstYard.id)
+        
+        // Core data loaded - hide loading state
+        setInitialLoading(false)
+        
+        // Load stock data in background (non-blocking)
+        if (productsResult.data) {
+          const products = productsResult.data as unknown as Product[]
+          const yards = allYardsResult.data as unknown as CoalYard[]
+          
+          // Load essential stock for selected yard first
+          loadProductStock(firstYard.id)
+          
+          // Load comprehensive stock data in background
+          setTimeout(() => {
+            loadAllYardStockOptimized(yards, products, (userData as any).organization_id)
+            loadAllStockOverview(yards, products, (userData as any).organization_id)
+          }, 100) // Small delay to let UI render first
+        }
       } else {
         console.log("❌ No yards data found or empty array")
-      }
-
-      // Load stock data for all yards efficiently
-      if (allYardsResult.data && allYardsResult.data.length > 0 && productsResult.data) {
-        loadAllYardStockOptimized(allYardsResult.data as unknown as CoalYard[], productsResult.data as unknown as Product[], (userData as any).organization_id)
-        loadAllStockOverview(allYardsResult.data as unknown as CoalYard[], productsResult.data as unknown as Product[], (userData as any).organization_id)
+        setInitialLoading(false)
       }
     } catch (error) {
       console.error("❌ Error loading data:", error)
+      setInitialLoading(false)
     }
   }
 
@@ -698,6 +702,41 @@ export default function PickupsPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Show loading state while data is being fetched
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" className="rounded-full" size="icon" onClick={() => router.back()}>
+              <ArrowLeft className="h-6 w-6" />
+            </Button>
+            <h1 className="text-2xl font-bold">Add Pickups</h1>
+            <Button variant="ghost" className="rounded-full" disabled>
+              <DocumentText size={56} />
+            </Button>
+          </div>
+        </div>
+
+        {/* Loading Content */}
+        <div className="p-4 space-y-6">
+          <Card className="rounded-[32px]">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading yards and products...</p>
+                  <p className="text-sm text-gray-500 mt-1">Please wait while we prepare your pickup form</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
   }
 
   return (

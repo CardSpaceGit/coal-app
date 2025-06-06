@@ -1579,10 +1579,6 @@ export default function DashboardPage() {
 
                                   <div className="mt-4 pt-4 border-t border-gray-200 space-y-2 text-sm">
                                     <div className="flex justify-between">
-                                      <span className="text-gray-600">Delivered by:</span>
-                                      <span className="font-medium">{delivery.created_by || 'N/A'}</span>
-                                    </div>
-                                    <div className="flex justify-between">
                                       <span className="text-gray-600">Coal Yard:</span>
                                       <span className="font-medium">{delivery.coal_yard?.name}</span>
                                     </div>
@@ -1957,7 +1953,7 @@ export default function DashboardPage() {
             <div className="flex-1 p-4 space-y-4 overflow-y-auto">
               <Button
                 variant="outline"
-                className="w-full h-20 justify-start border-2 border-gray-200 hover:border-yellow-500 hover:bg-yellow-50 rounded-[40px]"
+                className="w-full h-20 justify-start border-[1px] border-gray-100 hover:border-gray-200 hover:bg-gray-50 rounded-[24px]"
                 onClick={() => {
                   setShowAddModal(false)
                   router.push("/deliveries")
@@ -1982,7 +1978,7 @@ export default function DashboardPage() {
 
               <Button
                 variant="outline"
-                className="w-full h-20 justify-start border-2 border-gray-200 hover:border-yellow-500 hover:bg-yellow-50 rounded-[40px]"
+                className="w-full h-20 justify-start border-[1px] border-gray-100 hover:border-gray-200 hover:bg-gray-50 rounded-[24px]"
                 onClick={() => {
                   setShowAddModal(false)
                   router.push("/pickups")
@@ -1999,7 +1995,7 @@ export default function DashboardPage() {
                     />
                   </div>
                   <div className="text-left">
-                    <h3 className="font-semibold text-gray-800 text-lg">Add pickups</h3>
+                    <h3 className="font-semibold text-gray-800 text-lg">Add Pickups</h3>
                     <p className="text-sm text-gray-500">Load going out of the yard</p>
                   </div>
                 </div>
@@ -2078,7 +2074,7 @@ export default function DashboardPage() {
 
       {/* Edit Record Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="!fixed !inset-x-0 !bottom-0 !top-auto !left-0 !right-0 !transform-none !translate-x-0 !translate-y-0 mx-0 max-w-none !w-screen h-auto max-h-[80vh] rounded-t-3xl !rounded-b-none border-0 p-0 m-0 animate-slide-in-from-bottom-full data-[state=closed]:animate-slide-out-to-bottom-full [&>button]:hidden">
+        <DialogContent className="!fixed !inset-x-0 !bottom-0 !top-auto !left-0 !right-0 !transform-none !translate-x-0 !translate-y-0 mx-0 max-w-none !w-screen h-auto max-h-[80vh] rounded-t-[24px] !rounded-b-none border-0 p-0 m-0 animate-slide-in-from-bottom-full data-[state=closed]:animate-slide-out-to-bottom-full [&>button]:hidden">
           <div className="flex flex-col w-full">
             <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
               <DialogTitle className="text-xl font-bold text-gray-800">
@@ -2175,11 +2171,11 @@ export default function DashboardPage() {
                   }
                 }}
                 variant="outline"
-                className="w-full h-16 justify-start text-left"
+                className="w-full h-16 rounded-[24px] justify-start text-left"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <Edit size={24} className="text-gray-600" />
+                  <div className="w-12 h-12 bg-gray-100 rounded-[24px] flex items-center justify-center">
+                    <Edit size={24} className="text-gray-600 rounded-[24px]" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-800">Edit record</h3>
@@ -2194,11 +2190,11 @@ export default function DashboardPage() {
                   setShowDeleteModal(true)
                 }}
                 variant="outline"
-                className="w-full h-16 justify-start text-left border-red-200 hover:border-red-300 hover:bg-red-50"
+                className="w-full h-16 rounded-[24px] justify-start text-left border-red-200 hover:border-red-300 hover:bg-red-50"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                    <Trash size={24} className="text-red-600" />
+                  <div className="w-12 h-12 bg-red-100 rounded-[24px] flex items-center justify-center">
+                    <Trash size={24} className="text-red-600 rounded-[24px]" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-red-600">Delete record</h3>
