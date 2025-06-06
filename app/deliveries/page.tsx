@@ -618,7 +618,7 @@ export default function DeliveriesPage() {
                           </div>
 
                           <div className="text-right">
-                            <p className={`text-xl font-bold ${stockAmount === 0 ? "text-red-500" : "text-gray-800"}`}>
+                            <p className={`text-lg font-bold ${stockAmount === 0 ? "text-red-500" : "text-gray-800"}`}>
                               {stockAmount.toLocaleString()} t
                             </p>
                             {stockAmount === 0 && <p className="text-xs text-red-500">Out of stock</p>}

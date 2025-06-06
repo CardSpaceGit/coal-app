@@ -551,6 +551,49 @@ export default function PickupsPage() {
   }
 
   const updateContainer = (id: string, field: keyof ContainerEntry, value: string | string[]) => {
+    // Special validation for weight field
+    if (field === "weight" && typeof value === "string") {
+      const container = containers.find((c) => c.id === id)
+      if (container) {
+        // Calculate maximum available weight for this container
+        const selectedProductStocks = container.selectedProducts.map(
+          (productId) => productStock[productId] || 0,
+        )
+        
+        // Sum of all selected product stocks
+        const totalAvailableStock = selectedProductStocks.reduce((sum, stock) => sum + stock, 0)
+        
+        // Calculate already allocated weight for selected products across other containers
+        let allocatedWeight = 0
+        containers.forEach((c) => {
+          if (c.id !== container.id && c.selectedProducts.length > 0 && c.weight) {
+            const weightPerProduct = Number.parseFloat(c.weight) / c.selectedProducts.length
+            c.selectedProducts.forEach((productId) => {
+              if (container.selectedProducts.includes(productId)) {
+                allocatedWeight += weightPerProduct
+              }
+            })
+          }
+        })
+        
+        // Remaining available is total available minus what's already allocated
+        const maxAvailable = Math.max(0, totalAvailableStock - allocatedWeight)
+        
+        // Parse the input value and validate
+        const numericValue = Number.parseFloat(value.replace(/,/g, ''))
+        if (!isNaN(numericValue) && numericValue > maxAvailable) {
+          // Don't update if the weight exceeds what's available
+          toast({
+            title: "Invalid Weight",
+            description: `Maximum available weight is ${maxAvailable.toLocaleString()}t. You cannot pickup more than what's in stock.`,
+            variant: "destructive",
+            duration: 3000,
+          })
+          return
+        }
+      }
+    }
+    
     setContainers(containers.map((c) => (c.id === id ? { ...c, [field]: value } : c)))
   }
 
@@ -576,8 +619,8 @@ export default function PickupsPage() {
       return sum + (productStock[productId] || 0)
     }, 0)
 
-    // Cap at 2,500 tons as specified
-    return Math.min(totalAvailable, 2500)
+    // Return the actual total available stock without arbitrary cap
+    return totalAvailable
   }
 
   const handleContainerNumberChange = (containerId: string, value: string) => {
@@ -949,7 +992,7 @@ export default function PickupsPage() {
                             stockAmount === 0
                               ? "border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed"
                               : isSelected
-                                ? "border-gray-800 bg-gray-50 cursor-pointer"
+                                ? "border-yellow-500 bg-yellow-50 cursor-pointer"
                                 : "border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 cursor-pointer"
                           }`}
                         >
@@ -959,7 +1002,7 @@ export default function PickupsPage() {
                                 stockAmount === 0
                                   ? "border-gray-300 bg-gray-200"
                                   : isSelected
-                                    ? "border-gray-800 bg-gray-800"
+                                    ? "border-yellow-500 bg-yellow-500"
                                     : "border-gray-300"
                               }`}
                             >
@@ -985,7 +1028,7 @@ export default function PickupsPage() {
                           </div>
 
                           <div className="text-right">
-                            <p className={`text-xl font-bold ${stockAmount === 0 ? "text-red-500" : "text-gray-800"}`}>
+                            <p className={`text-lg font-bold ${stockAmount === 0 ? "text-red-500" : "text-gray-800"}`}>
                               {stockAmount.toLocaleString()} t
                             </p>
                             {stockAmount === 0 && <p className="text-xs text-red-500">Out of stock</p>}
@@ -1026,11 +1069,8 @@ export default function PickupsPage() {
                           (productId) => productStock[productId] || 0,
                         )
 
-                        // Sum of all selected product stocks (capped at 2,500 tons)
-                        const totalAvailableStock = Math.min(
-                          selectedProductStocks.reduce((sum, stock) => sum + stock, 0),
-                          2500,
-                        )
+                        // Sum of all selected product stocks
+                        const totalAvailableStock = selectedProductStocks.reduce((sum, stock) => sum + stock, 0)
 
                         // Calculate already allocated weight for selected products across other containers
                         let allocatedWeight = 0
@@ -1088,7 +1128,7 @@ export default function PickupsPage() {
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600">Outgoing Load Left</p>
+            <p className="text-sm text-gray-600">Total Outgoing Load</p>
             <p className="font-semibold">{outgoingLoad.toLocaleString()} t</p>
           </div>
           <Button

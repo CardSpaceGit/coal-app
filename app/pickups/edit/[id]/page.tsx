@@ -699,11 +699,7 @@ export default function EditPickupPage() {
                         selectedYard === yard.id ? "border-yellow-500 bg-yellow-50" : "border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300"
                       }`}
                     >
-                      {selectedYard === yard.id && (
-                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                          <div className="w-3 h-3 bg-white rounded-full" />
-                        </div>
-                      )}
+                      
                       <Image
                         src={yard.image_url || "/placeholder.svg?height=80&width=120&text=" + yard.code}
                         alt={yard.name}
