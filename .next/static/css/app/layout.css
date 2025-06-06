@@ -1253,6 +1253,9 @@ video {
 .w-px {
   width: 1px;
 }
+.w-80 {
+  width: 20rem;
+}
 .min-w-0 {
   min-width: 0px;
 }
@@ -1536,6 +1539,9 @@ video {
   --tw-space-y-reverse: 0;
   margin-top: calc(1.5rem * calc(1 - var(--tw-space-y-reverse)));
   margin-bottom: calc(1.5rem * var(--tw-space-y-reverse));
+}
+.self-start {
+  align-self: flex-start;
 }
 .overflow-auto {
   overflow: auto;
@@ -2062,6 +2068,9 @@ video {
 }
 .pt-8 {
   padding-top: 2rem;
+}
+.pr-4 {
+  padding-right: 1rem;
 }
 .text-left {
   text-align: left;
@@ -3728,6 +3737,10 @@ video {
     display: block;
   }
 
+  .md\:inline {
+    display: inline;
+  }
+
   .md\:flex {
     display: flex;
   }
@@ -3758,6 +3771,26 @@ video {
 
   .md\:grid-cols-none {
     grid-template-columns: none;
+  }
+
+  .md\:flex-row {
+    flex-direction: row;
+  }
+
+  .md\:items-center {
+    align-items: center;
+  }
+
+  .md\:justify-between {
+    justify-content: space-between;
+  }
+
+  .md\:gap-4 {
+    gap: 1rem;
+  }
+
+  .md\:self-auto {
+    align-self: auto;
   }
 
   .md\:text-5xl {
@@ -3820,6 +3853,34 @@ video {
   .lg\:grid-cols-4 {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+}
+
+.\[\&\:\:-webkit-calendar-picker-indicator\]\:absolute::-webkit-calendar-picker-indicator {
+  position: absolute;
+}
+
+.\[\&\:\:-webkit-calendar-picker-indicator\]\:inset-0::-webkit-calendar-picker-indicator {
+  inset: 0px;
+}
+
+.\[\&\:\:-webkit-calendar-picker-indicator\]\:hidden::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.\[\&\:\:-webkit-calendar-picker-indicator\]\:h-full::-webkit-calendar-picker-indicator {
+  height: 100%;
+}
+
+.\[\&\:\:-webkit-calendar-picker-indicator\]\:w-full::-webkit-calendar-picker-indicator {
+  width: 100%;
+}
+
+.\[\&\:\:-webkit-calendar-picker-indicator\]\:cursor-pointer::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}
+
+.\[\&\:\:-webkit-calendar-picker-indicator\]\:opacity-0::-webkit-calendar-picker-indicator {
+  opacity: 0;
 }
 
 .\[\&\:\:-webkit-inner-spin-button\]\:appearance-none::-webkit-inner-spin-button {

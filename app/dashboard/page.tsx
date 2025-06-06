@@ -63,6 +63,7 @@ export default function DashboardPage() {
   const [grokSummary, setGrokSummary] = useState<string>("")
   const [loadingGrokSummary, setLoadingGrokSummary] = useState(false)
   const [loadingExport, setLoadingExport] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
 
   // Add this near the top of the component, after the existing useEffect
   // useEffect(() => {
@@ -686,6 +687,32 @@ export default function DashboardPage() {
     })
   }
 
+  // Filter function for search
+  const filterRecords = (records: any[], searchTerm: string) => {
+    if (!searchTerm.trim()) return records
+    
+    const lowercaseSearch = searchTerm.toLowerCase().trim()
+    
+    return records.filter((record: any) => {
+      // Search in weighbridge slip/number
+      const weighbridgeNumber = (record.weighbridge_slip || record.id || "").toString().toLowerCase()
+      
+      // Search in container number (for pickups)
+      const containerNumber = (record.container_number || "").toString().toLowerCase()
+      
+      // Search in product name
+      const productName = (record.product?.name || "").toLowerCase()
+      
+      return weighbridgeNumber.includes(lowercaseSearch) ||
+             containerNumber.includes(lowercaseSearch) ||
+             productName.includes(lowercaseSearch)
+    })
+  }
+
+  // Get filtered data
+  const filteredDeliveryData = filterRecords(deliveryData, searchTerm)
+  const filteredPickupData = filterRecords(pickupData, searchTerm)
+
   const handleDeleteRecord = async () => {
     if (!selectedRecord || !user) return
 
@@ -937,9 +964,10 @@ export default function DashboardPage() {
                                 type="date"
                                 value={dateRange.start}
                                 onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
-                                className="pr-10"
+                                className="cursor-pointer pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                style={{ colorScheme: 'light' }}
                               />
-                              <Calendar1 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                              <Calendar1 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                             </div>
                           </div>
                           <div>
@@ -949,9 +977,10 @@ export default function DashboardPage() {
                                 type="date"
                                 value={dateRange.end}
                                 onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
-                                className="pr-10"
+                                className="cursor-pointer pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                style={{ colorScheme: 'light' }}
                               />
-                              <Calendar1 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                              <Calendar1 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                             </div>
                           </div>
                           <div className="flex justify-end gap-2">
@@ -1013,8 +1042,8 @@ export default function DashboardPage() {
             </div>
 
             {/* Date Range Display with Export Button */}
-            <div className="flex items-center justify-between gap-4 text-gray-600 mb-6 bg-gray-50 p-3 rounded-[20px]">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-gray-600 mb-6 bg-gray-50 p-3 rounded-[20px]">
+              <div className="flex items-center gap-2 md:gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
                   <Calendar1 size={16} />
                   <span className="text-sm">
@@ -1026,7 +1055,7 @@ export default function DashboardPage() {
                     })}
                   </span>
                 </div>
-                <span className="text-gray-400">|</span>
+                <span className="text-gray-400 hidden md:inline">|</span>
                 <div className="flex items-center gap-2">
                   <Calendar1 size={16} />
                   <span className="text-sm">
@@ -1045,7 +1074,7 @@ export default function DashboardPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowDateFilter(true)}
-                className="flex items-center gap-2 bg-white hover:bg-gray-50 border-gray-300 text-gray-600 hover:text-gray-800"
+                className="flex items-center gap-2 bg-white hover:bg-gray-50 border-gray-300 text-gray-600 hover:text-gray-800 self-start md:self-auto w-full md:w-auto"
               >
                 <Edit size={16} />
                 Edit
@@ -1111,21 +1140,10 @@ export default function DashboardPage() {
                     className="w-10 h-10 rounded-[16px]"
                   />
                 </div>
-                                 <div>
-                   <h3 className="font-semibold text-gray-800">Live Operations Monitor</h3>
-                   <p className="text-xs text-gray-600">Real-time insights powered by Grok AI</p>
-                 </div>
-                <button
-                  onClick={generateGrokSummary}
-                  disabled={loadingGrokSummary}
-                  className="ml-auto p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-white/50 transition-colors"
-                                     title="Refresh analysis"
-                >
-                  <Refresh 
-                    size={16}
-                    className={loadingGrokSummary ? 'animate-spin' : ''}
-                  />
-                </button>
+                <div>
+                  <h3 className="font-semibold text-gray-800">Live Operations Monitor</h3>
+                  <p className="text-xs text-gray-600">Real-time insights powered by Grok AI</p>
+                </div>
               </div>
               <div className="text-sm text-gray-700 leading-relaxed">
                 {loadingGrokSummary ? (
@@ -1439,27 +1457,48 @@ export default function DashboardPage() {
         {/* Deliveries and Pickups Tables */}
         <Card className="bg-white rounded-[32px]">
           <CardContent className="p-6">
-            <div className="flex space-x-8 mb-6">
-              <button
-                onClick={() => setActiveTab("deliveries")}
-                className={`text-xl pb-1 transition-all ${
-                  activeTab === "deliveries"
-                    ? "font-bold text-gray-800 border-b-2 border-gray-800"
-                    : "font-light text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                Deliveries
-              </button>
-              <button
-                onClick={() => setActiveTab("pickups")}
-                className={`text-xl pb-1 transition-all ${
-                  activeTab === "pickups"
-                    ? "font-bold text-gray-800 border-b-2 border-gray-800"
-                    : "font-light text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                Pickups
-              </button>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex space-x-8">
+                <button
+                  onClick={() => setActiveTab("deliveries")}
+                  className={`text-xl pb-1 transition-all ${
+                    activeTab === "deliveries"
+                      ? "font-bold text-gray-800 border-b-2 border-gray-800"
+                      : "font-light text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Deliveries
+                </button>
+                <button
+                  onClick={() => setActiveTab("pickups")}
+                  className={`text-xl pb-1 transition-all ${
+                    activeTab === "pickups"
+                      ? "font-bold text-gray-800 border-b-2 border-gray-800"
+                      : "font-light text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Pickups
+                </button>
+              </div>
+              
+              {/* Search Input */}
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Search by container, weighbridge, or product..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-80 pl-4 pr-4 py-2 rounded-full border-2 border-gray-200 focus:border-yellow-500 focus:ring-0"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <CloseSquare size={16} />
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="space-y-6">
@@ -1467,7 +1506,7 @@ export default function DashboardPage() {
                 // Deliveries content
                 <>
                   {Object.entries(
-                    (deliveryData as any[]).reduce(
+                    (filteredDeliveryData as any[]).reduce(
                       (groups: Record<string, any[]>, delivery: any) => {
                         const date = new Date(delivery.delivery_date).toLocaleDateString("en-US", {
                           weekday: "short",
@@ -1661,7 +1700,7 @@ export default function DashboardPage() {
                     </div>
                   ))}
 
-                  {deliveryData.length === 0 && (
+                  {filteredDeliveryData.length === 0 && (
                     <div className="text-center py-8">
                       {/* Empty state image */}
                       <div className="mb-6">
@@ -1675,7 +1714,9 @@ export default function DashboardPage() {
                           />
                         </div>
                       </div>
-                      <p className="text-gray-500 text-lg">No deliveries found</p>
+                                              <p className="text-gray-500 text-lg">
+                          {searchTerm ? `No deliveries found matching "${searchTerm}"` : "No deliveries found"}
+                        </p>
                     </div>
                   )}
                 </>
@@ -1683,7 +1724,7 @@ export default function DashboardPage() {
                 // Pickups content
                 <>
                   {Object.entries(
-                    (pickupData as any[]).reduce(
+                    (filteredPickupData as any[]).reduce(
                       (groups: Record<string, any[]>, pickup: any) => {
                         const date = new Date(pickup.pickup_date).toLocaleDateString("en-US", {
                           weekday: "short",
@@ -1905,7 +1946,7 @@ export default function DashboardPage() {
                     </div>
                   ))}
 
-                  {pickupData.length === 0 && (
+                  {filteredPickupData.length === 0 && (
                     <div className="text-center py-8">
                       {/* Empty state image */}
                       <div className="mb-6">
@@ -1919,7 +1960,9 @@ export default function DashboardPage() {
                           />
                         </div>
                       </div>
-                      <p className="text-gray-500 text-lg">No pickups found</p>
+                                              <p className="text-gray-500 text-lg">
+                          {searchTerm ? `No pickups found matching "${searchTerm}"` : "No pickups found"}
+                        </p>
                     </div>
                   )}
                 </>

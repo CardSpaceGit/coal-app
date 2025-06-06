@@ -736,13 +736,10 @@ export default function EditPickupPage() {
                     type="date"
                     value={pickupDate}
                     onChange={(e) => setPickupDate(e.target.value)}
-                    className="pr-10 rounded-full border-gray-300"
-                    style={{
-                      WebkitAppearance: 'none',
-                      MozAppearance: 'textfield'
-                    }}
+                    className="cursor-pointer pr-10 rounded-full border-gray-300 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    style={{ colorScheme: 'light' }}
                   />
-                  <Calendar1 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Calendar1 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 </div>
               </div>
 

@@ -1,6 +1,5 @@
 {
-  "/api/grok-summary/route": "app/api/grok-summary/route.js",
+  "/login/page": "app/login/page.js",
   "/dashboard/page": "app/dashboard/page.js",
-  "/pickups/page": "app/pickups/page.js",
-  "/login/page": "app/login/page.js"
+  "/pickups/page": "app/pickups/page.js"
 }
