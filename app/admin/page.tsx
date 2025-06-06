@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Users, Building2, Shield, Plus, Menu } from "lucide-react"
+import { Users, Building2, Shield, Plus, Menu, Warehouse, Package } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/hooks/useAuth"
 import Image from "next/image"
@@ -13,6 +13,8 @@ interface Stats {
   totalUsers: number
   totalOrganizations: number
   totalRoles: number
+  totalProducts: number
+  totalCoalYards: number
   activeUsers: number
 }
 
@@ -23,9 +25,12 @@ export default function AdminDashboard() {
     totalUsers: 0,
     totalOrganizations: 0,
     totalRoles: 0,
+    totalProducts: 0,
+    totalCoalYards: 0,
     activeUsers: 0
   })
   const [loading, setLoading] = useState(true)
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
 
   useEffect(() => {
     loadStats()
@@ -48,10 +53,22 @@ export default function AdminDashboard() {
         .from('roles')
         .select('id')
 
+      // Get products count
+      const { data: products } = await supabase
+        .from('products')
+        .select('id')
+
+      // Get coal yards count
+      const { data: coalYards } = await supabase
+        .from('coal_yards')
+        .select('id')
+
       setStats({
         totalUsers: orgUsers?.length || 0,
         totalOrganizations: organizations?.length || 0,
         totalRoles: roles?.length || 0,
+        totalProducts: products?.length || 0,
+        totalCoalYards: coalYards?.length || 0,
         activeUsers: orgUsers?.filter(u => u.is_active).length || 0
       })
     } catch (error) {
@@ -59,6 +76,15 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleNavigation = (href: string, sectionTitle: string) => {
+    setNavigatingTo(sectionTitle)
+    router.push(href)
+    // Clear loading state after a short delay (since router.push is not awaitable)
+    setTimeout(() => {
+      setNavigatingTo(null)
+    }, 1000)
   }
 
   const adminSections = [
@@ -69,6 +95,22 @@ export default function AdminDashboard() {
       href: "/admin/organizations",
       color: "bg-blue-500",
       count: stats.totalOrganizations
+    },
+    {
+      title: "Products",
+      description: "Manage coal products and organization links",
+      icon: Package,
+      href: "/admin/products",
+      color: "bg-indigo-500",
+      count: stats.totalProducts
+    },
+    {
+      title: "Coal Yards",
+      description: "Manage coal yards and locations",
+      icon: Warehouse,
+      href: "/admin/coal-yards",
+      color: "bg-orange-500",
+      count: stats.totalCoalYards
     },
     {
       title: "Roles",
@@ -156,7 +198,11 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs text-gray-600 uppercase tracking-wide">Total Users</p>
-                      <p className="text-2xl font-bold text-gray-900">{loading ? "..." : stats.totalUsers}</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {loading ? (
+                          <span className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-500"></span>
+                        ) : stats.totalUsers}
+                      </p>
                     </div>
                     <div className="p-2 bg-blue-100 rounded-full">
                       <Users className="h-5 w-5 text-blue-600" />
@@ -168,7 +214,11 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs text-gray-600 uppercase tracking-wide">Active Users</p>
-                      <p className="text-2xl font-bold text-gray-900">{loading ? "..." : stats.activeUsers}</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {loading ? (
+                          <span className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-500"></span>
+                        ) : stats.activeUsers}
+                      </p>
                     </div>
                     <div className="p-2 bg-green-100 rounded-full">
                       <Users className="h-5 w-5 text-green-600" />
@@ -180,7 +230,11 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs text-gray-600 uppercase tracking-wide">Organizations</p>
-                      <p className="text-2xl font-bold text-gray-900">{loading ? "..." : stats.totalOrganizations}</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {loading ? (
+                          <span className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-500"></span>
+                        ) : stats.totalOrganizations}
+                      </p>
                     </div>
                     <div className="p-2 bg-purple-100 rounded-full">
                       <Building2 className="h-5 w-5 text-purple-600" />
@@ -192,7 +246,11 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs text-gray-600 uppercase tracking-wide">Roles</p>
-                      <p className="text-2xl font-bold text-gray-900">{loading ? "..." : stats.totalRoles}</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {loading ? (
+                          <span className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-500"></span>
+                        ) : stats.totalRoles}
+                      </p>
                     </div>
                     <div className="p-2 bg-orange-100 rounded-full">
                       <Shield className="h-5 w-5 text-orange-600" />
@@ -207,83 +265,46 @@ export default function AdminDashboard() {
         {/* Admin Management Sections */}
         <Card className="bg-white rounded-[32px]">
           <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-8">
               <h2 className="text-2xl font-bold text-gray-800">Management</h2>
             </div>
 
-            <div className="bg-gray-50 p-4 rounded-[20px]">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {adminSections.map((section) => (
-                  <div key={section.title} className="bg-white rounded-[16px] p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className={`p-2 rounded-full ${section.color}`}>
-                        <section.icon className="h-5 w-5 text-white" />
-                      </div>
-                      <span className="text-lg font-bold text-gray-400">
-                        {loading ? "..." : section.count}
-                      </span>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {adminSections.map((section) => (
+                <div key={section.title} className="bg-gray-50 rounded-2xl p-6 hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={`p-3 rounded-full ${section.color}`}>
+                      <section.icon className="h-6 w-6 text-white" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{section.title}</h3>
-                    <p className="text-sm text-gray-600 mb-4">{section.description}</p>
-                    <Button 
-                      onClick={() => router.push(section.href)}
-                      className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-800 rounded-full"
-                    >
-                      Manage {section.title}
-                    </Button>
+                    <span className="text-2xl font-bold text-gray-400">
+                      {loading ? (
+                        <span className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-500"></span>
+                      ) : section.count}
+                    </span>
                   </div>
-                ))}
-              </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{section.title}</h3>
+                  <p className="text-gray-600 mb-6 text-sm leading-relaxed">{section.description}</p>
+                  <Button 
+                    onClick={() => handleNavigation(section.href, section.title)}
+                    disabled={navigatingTo === section.title}
+                    className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold py-3 rounded-2xl shadow-sm hover:shadow-md transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {navigatingTo === section.title ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-800"></div>
+                        Loading...
+                      </div>
+                    ) : (
+                      `Manage ${section.title}`
+                    )}
+                  </Button>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
 
-        {/* Quick Actions */}
-        <Card className="bg-white rounded-[32px]">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Quick Actions</h2>
-              <Plus className="h-6 w-6 text-gray-400" />
-            </div>
 
-            <div className="bg-gray-50 p-4 rounded-[20px]">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Button 
-                  variant="outline" 
-                  className="w-full h-16 bg-white rounded-[16px] border-gray-200 hover:bg-gray-50"
-                  onClick={() => router.push('/admin/organizations')}
-                >
-                  <div className="flex items-center gap-3">
-                    <Building2 className="h-5 w-5 text-blue-600" />
-                    <span className="font-medium">Add Organization</span>
-                  </div>
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full h-16 bg-white rounded-[16px] border-gray-200 hover:bg-gray-50"
-                  onClick={() => router.push('/admin/roles')}
-                >
-                  <div className="flex items-center gap-3">
-                    <Shield className="h-5 w-5 text-green-600" />
-                    <span className="font-medium">Create Role</span>
-                  </div>
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full h-16 bg-white rounded-[16px] border-gray-200 hover:bg-gray-50"
-                  onClick={() => router.push('/admin/users')}
-                >
-                  <div className="flex items-center gap-3">
-                    <Users className="h-5 w-5 text-purple-600" />
-                    <span className="font-medium">Invite User</span>
-                  </div>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   )

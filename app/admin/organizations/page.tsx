@@ -8,17 +8,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Building2, Plus, Edit, Trash2, Menu } from "lucide-react"
+import { Building2, Plus, Edit, Trash2, ArrowLeft } from "lucide-react"
 import { supabase } from "@/lib/supabase"
-import { useToast } from "@/hooks/use-simple-toast"
+
 import { useAuth } from "@/hooks/useAuth"
 import Image from "next/image"
 
 interface Organization {
   id: string
   name: string
+  slug: string
   description: string | null
-  logo_url: string | null
   website: string | null
   created_at: string
   updated_at: string
@@ -29,14 +29,33 @@ export default function OrganizationsPage() {
   const router = useRouter()
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
+  const [isCreating, setIsCreating] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [orgToDelete, setOrgToDelete] = useState<{ id: string; name: string; userCount?: number } | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     website: ''
   })
-  const { toast } = useToast()
+  
+  // Toast notification state
+  const [toast, setToast] = useState<{
+    show: boolean
+    message: string
+    type: 'success' | 'error'
+  }>({ show: false, message: '', type: 'success' })
+
+  // Toast notification function
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, message, type })
+    // Auto-dismiss after 4 seconds
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }))
+    }, 4000)
+  }
 
   useEffect(() => {
     loadOrganizations()
@@ -53,11 +72,7 @@ export default function OrganizationsPage() {
       setOrganizations((data as unknown as Organization[]) || [])
     } catch (error) {
       console.error('Error loading organizations:', error)
-      toast({
-        title: "Error",
-        description: "Failed to load organizations",
-        variant: "destructive",
-      })
+      showToast("Failed to load organizations", "error")
     } finally {
       setLoading(false)
     }
@@ -65,32 +80,37 @@ export default function OrganizationsPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsCreating(true)
     try {
+      // Generate slug from name
+      const slug = formData.name
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+        .replace(/\s+/g, '-') // Replace spaces with dashes
+        .replace(/-+/g, '-') // Replace multiple dashes with single dash
+        .trim()
+
       const { error } = await supabase
         .from('organizations')
         .insert([{
           name: formData.name,
+          slug: slug,
           description: formData.description || null,
           website: formData.website || null
         }])
 
       if (error) throw error
 
-      toast({
-        title: "Success",
-        description: "Organization created successfully",
-      })
+      showToast("Organization created successfully", "success")
 
       setFormData({ name: '', description: '', website: '' })
       setShowCreateDialog(false)
       loadOrganizations()
     } catch (error) {
       console.error('Error creating organization:', error)
-      toast({
-        title: "Error",
-        description: "Failed to create organization",
-        variant: "destructive",
-      })
+      showToast("Failed to create organization", "error")
+    } finally {
+      setIsCreating(false)
     }
   }
 
@@ -98,75 +118,71 @@ export default function OrganizationsPage() {
     e.preventDefault()
     if (!editingOrg) return
 
+    setIsUpdating(true)
     try {
-      const { error } = await supabase
-        .from('organizations')
-        .update({
-          name: formData.name,
-          description: formData.description || null,
-          website: formData.website || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingOrg.id)
+      // Generate slug from name
+      const slug = formData.name
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+        .replace(/\s+/g, '-') // Replace spaces with dashes
+        .replace(/-+/g, '-') // Replace multiple dashes with single dash
+        .trim()
 
-      if (error) throw error
+              const { error } = await supabase
+          .from('organizations')
+          .update({
+            name: formData.name,
+            slug: slug,
+            description: formData.description || null,
+            website: formData.website || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingOrg.id)
 
-      toast({
-        title: "Success",
-        description: "Organization updated successfully",
-      })
+        if (error) throw error
 
-      setEditingOrg(null)
-      setFormData({ name: '', description: '', website: '' })
+        showToast("Organization updated successfully", "success")
+
+        setEditingOrg(null)
+        setFormData({ name: '', description: '', website: '' })
       loadOrganizations()
     } catch (error) {
       console.error('Error updating organization:', error)
-      toast({
-        title: "Error",
-        description: "Failed to update organization",
-        variant: "destructive",
-      })
+      showToast("Failed to update organization", "error")
+    } finally {
+      setIsUpdating(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this organization? This will also remove all associated users.')) {
-      return
-    }
+  const handleDelete = async (id: string, name: string) => {
+    // First check if there are users associated with this organization
+    const { data: users } = await supabase
+      .from('organization_users')
+      .select('id')
+      .eq('organization_id', id)
+
+    setOrgToDelete({ id, name, userCount: users?.length || 0 })
+    setShowDeleteDialog(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!orgToDelete) return
 
     try {
-      // First check if there are users associated with this organization
-      const { data: users } = await supabase
-        .from('organization_users')
-        .select('id')
-        .eq('organization_id', id)
-
-      if (users && users.length > 0) {
-        if (!confirm(`This organization has ${users.length} associated users. Are you sure you want to delete it? This will remove all user associations.`)) {
-          return
-        }
-      }
-
       const { error } = await supabase
         .from('organizations')
         .delete()
-        .eq('id', id)
+        .eq('id', orgToDelete.id)
 
       if (error) throw error
 
-      toast({
-        title: "Success",
-        description: "Organization deleted successfully",
-      })
-
+      showToast("Organization deleted successfully", "success")
+      setShowDeleteDialog(false)
+      setOrgToDelete(null)
       loadOrganizations()
     } catch (error) {
       console.error('Error deleting organization:', error)
-      toast({
-        title: "Error",
-        description: "Failed to delete organization",
-        variant: "destructive",
-      })
+      showToast("Failed to delete organization", "error")
     }
   }
 
@@ -188,8 +204,8 @@ export default function OrganizationsPage() {
         </div>
         <div className="relative z-10 p-4">
           <div className="flex items-center justify-between mb-6">
-            <Button variant="ghost" size="icon" className="text-white" onClick={() => router.push('/admin')}>
-              <Menu className="h-6 w-6" />
+            <Button variant="ghost" size="icon" className="text-white" onClick={() => router.back()}>
+              <ArrowLeft className="h-6 w-6" />
             </Button>
             <div className="flex items-center gap-2">
               <Button
@@ -286,8 +302,19 @@ export default function OrganizationsPage() {
                           />
                         </div>
                         <div className="flex gap-2 pt-4">
-                          <Button type="submit" className="bg-yellow-500 hover:bg-yellow-600 text-gray-800 rounded-full">
-                            Create Organization
+                          <Button 
+                            type="submit" 
+                            disabled={isCreating}
+                            className="bg-yellow-500 hover:bg-yellow-600 text-gray-800 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isCreating ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-800 mr-2"></div>
+                                Creating...
+                              </>
+                            ) : (
+                              'Create Organization'
+                            )}
                           </Button>
                           <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)} className="rounded-full">
                             Cancel
@@ -308,7 +335,10 @@ export default function OrganizationsPage() {
               </div>
               
               {loading ? (
-                <div className="text-center py-8 text-gray-500">Loading organizations...</div>
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+                  <p className="text-gray-500">Loading organizations...</p>
+                </div>
               ) : organizations.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   No organizations found. Create your first organization to get started.
@@ -358,7 +388,7 @@ export default function OrganizationsPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleDelete(org.id)}
+                                onClick={() => handleDelete(org.id, org.name)}
                                 className="rounded-full text-red-600 hover:text-red-700"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -417,8 +447,19 @@ export default function OrganizationsPage() {
                   />
                 </div>
                 <div className="flex gap-2 pt-4">
-                  <Button type="submit" className="bg-yellow-500 hover:bg-yellow-600 text-gray-800 rounded-full">
-                    Update Organization
+                  <Button 
+                    type="submit" 
+                    disabled={isUpdating}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-gray-800 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUpdating ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-800 mr-2"></div>
+                        Updating...
+                      </>
+                    ) : (
+                      'Update Organization'
+                    )}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => setEditingOrg(null)} className="rounded-full">
                     Cancel
@@ -429,6 +470,91 @@ export default function OrganizationsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="!fixed !inset-x-0 !bottom-0 !top-auto !left-0 !right-0 !transform-none !translate-x-0 !translate-y-0 mx-0 max-w-none !w-screen h-auto max-h-[70vh] rounded-t-3xl !rounded-b-none border-0 p-0 m-0">
+          <div className="flex flex-col w-full">
+            <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
+              <DialogTitle className="text-xl font-bold text-gray-800">Delete Organization</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 p-6">
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                  <Building2 className="w-8 h-8 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    Are you sure you want to delete this organization?
+                  </h3>
+                  <p className="text-gray-600">
+                    You're about to delete <span className="font-medium">{orgToDelete?.name}</span>. 
+                    {orgToDelete?.userCount && orgToDelete.userCount > 0 && (
+                      <span className="block mt-2 text-red-600 font-medium">
+                        ⚠️ This organization has {orgToDelete.userCount} associated user{orgToDelete.userCount !== 1 ? 's' : ''}. 
+                        Deleting it will remove all user associations.
+                      </span>
+                    )}
+                    <span className="block mt-2">This action cannot be undone.</span>
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-4 mt-8">
+                <Button
+                  onClick={() => {
+                    setShowDeleteDialog(false)
+                    setOrgToDelete(null)
+                  }}
+                  variant="outline"
+                  className="flex-1 rounded-full"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={confirmDelete}
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-full"
+                >
+                  Delete Organization
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className="fixed top-4 left-4 right-4 z-[100] flex justify-center">
+          <div
+            className={`flex items-center gap-3 p-4 rounded-[20px] shadow-lg transition-all duration-300 ease-in-out w-full max-w-sm ${
+              toast.type === 'success'
+                ? 'bg-green-500 text-white'
+                : 'bg-red-500 text-white'
+            } ${toast.show ? 'animate-slide-in-from-top' : 'animate-slide-out-to-top'}`}
+          >
+            <div className="flex-shrink-0">
+              {toast.type === 'success' ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+            <p className="text-sm font-medium flex-1">{toast.message}</p>
+            <button
+              onClick={() => setToast(prev => ({ ...prev, show: false }))}
+              className="flex-shrink-0 ml-2 hover:opacity-75 transition-opacity"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
-} 
+}

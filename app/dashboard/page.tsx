@@ -30,7 +30,7 @@ interface StockWithDetails extends Stock {
 }
 
 export default function DashboardPage() {
-  const { user, loading: authLoading, hasPermission } = useAuth()
+  const { user, superAdmin, loading: authLoading, hasPermission } = useAuth()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [stockData, setStockData] = useState<StockWithDetails[]>([])
   const [loading, setLoading] = useState(true)
@@ -1036,41 +1036,7 @@ export default function DashboardPage() {
                     </DialogContent>
                   </Dialog>
 
-                  <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-                    <DialogContent className="!fixed !inset-x-0 !bottom-0 !top-auto !left-0 !right-0 !transform-none !translate-x-0 !translate-y-0 mx-0 max-w-none !w-screen h-auto max-h-[80vh] rounded-t-3xl !rounded-b-none border-0 p-0 m-0 animate-slide-in-from-bottom-full data-[state=closed]:animate-slide-out-to-bottom-full [&>button]:hidden">
-                      <div className="flex flex-col w-full">
-                        <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
-                          <DialogTitle className="text-xl font-bold text-gray-800">Select Coal Yard to Edit</DialogTitle>
-                          <DialogDescription className="text-gray-600">
-                            Choose a coal yard to modify its settings and information
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="flex-1 p-6 space-y-4 max-h-[50vh] overflow-y-auto">
-                          {coalYards.map((yard) => (
-                            <Button
-                              key={yard.id}
-                              variant="outline"
-                              className="w-full justify-start h-12"
-                              onClick={() => {
-                                router.push(`/admin/coal-yards/${yard.id}/edit`)
-                                setShowEditModal(false)
-                              }}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
-                                  <span className="text-sm font-semibold">{yard.code}</span>
-                                </div>
-                                <div className="text-left">
-                                  <p className="font-medium">{yard.name}</p>
-                                  <p className="text-sm text-gray-500">{yard.code}</p>
-                                </div>
-                              </div>
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+
                 </div>
               </div>
             </div>

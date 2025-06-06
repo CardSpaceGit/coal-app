@@ -44,7 +44,7 @@ export default function LoginPage() {
           .single()
 
         if (superAdminData) {
-          router.push("/super-admin")
+          router.push("/admin")
           return
         }
 

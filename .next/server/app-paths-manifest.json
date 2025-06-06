@@ -1,8 +1,8 @@
 {
-  "/api/create-user/route": "app/api/create-user/route.js",
   "/login/page": "app/login/page.js",
-  "/test-create-user/page": "app/test-create-user/page.js",
+  "/page": "app/page.js",
   "/admin/page": "app/admin/page.js",
-  "/admin/roles/page": "app/admin/roles/page.js",
-  "/admin/users/page": "app/admin/users/page.js"
+  "/admin/products/page": "app/admin/products/page.js",
+  "/admin/organizations/page": "app/admin/organizations/page.js",
+  "/admin/roles/page": "app/admin/roles/page.js"
 }

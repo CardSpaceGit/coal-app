@@ -9,9 +9,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Shield, Plus, Edit, Trash2, Menu } from "lucide-react"
+import { Shield, Plus, Edit, Trash2, ArrowLeft } from "lucide-react"
 import { supabase } from "@/lib/supabase"
-import { useToast } from "@/hooks/use-simple-toast"
+
 import { useAuth } from "@/hooks/useAuth"
 import Image from "next/image"
 
@@ -36,7 +36,24 @@ export default function RolesPage() {
     description: '',
     permissions: ''
   })
-  const { toast } = useToast()
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [roleToDelete, setRoleToDelete] = useState<{ id: string; name: string; userCount?: number } | null>(null)
+  
+  // Toast notification state
+  const [toast, setToast] = useState<{
+    show: boolean
+    message: string
+    type: 'success' | 'error'
+  }>({ show: false, message: '', type: 'success' })
+
+  // Toast notification function
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, message, type })
+    // Auto-dismiss after 4 seconds
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }))
+    }, 4000)
+  }
 
   useEffect(() => {
     loadRoles()
@@ -53,11 +70,7 @@ export default function RolesPage() {
       setRoles((data as unknown as Role[]) || [])
     } catch (error) {
       console.error('Error loading roles:', error)
-      toast({
-        title: "Error",
-        description: "Failed to load roles",
-        variant: "destructive",
-      })
+      showToast("Failed to load roles", "error")
     } finally {
       setLoading(false)
     }
@@ -80,21 +93,14 @@ export default function RolesPage() {
 
       if (error) throw error
 
-      toast({
-        title: "Success",
-        description: "Role created successfully",
-      })
+      showToast("Role created successfully", "success")
 
       setFormData({ name: '', description: '', permissions: '' })
       setShowCreateDialog(false)
       loadRoles()
     } catch (error) {
       console.error('Error creating role:', error)
-      toast({
-        title: "Error",
-        description: "Failed to create role",
-        variant: "destructive",
-      })
+      showToast("Failed to create role", "error")
     }
   }
 
@@ -119,62 +125,46 @@ export default function RolesPage() {
 
       if (error) throw error
 
-      toast({
-        title: "Success",
-        description: "Role updated successfully",
-      })
+      showToast("Role updated successfully", "success")
 
       setEditingRole(null)
       setFormData({ name: '', description: '', permissions: '' })
       loadRoles()
     } catch (error) {
       console.error('Error updating role:', error)
-      toast({
-        title: "Error",
-        description: "Failed to update role",
-        variant: "destructive",
-      })
+      showToast("Failed to update role", "error")
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this role? This will affect all users with this role.')) {
-      return
-    }
+  const handleDelete = async (id: string, name: string) => {
+    // First check if there are users with this role
+    const { data: users } = await supabase
+      .from('organization_users')
+      .select('id')
+      .eq('role_id', id)
+
+    setRoleToDelete({ id, name, userCount: users?.length || 0 })
+    setShowDeleteDialog(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!roleToDelete) return
 
     try {
-      // First check if there are users with this role
-      const { data: users } = await supabase
-        .from('organization_users')
-        .select('id')
-        .eq('role_id', id)
-
-      if (users && users.length > 0) {
-        if (!confirm(`This role is assigned to ${users.length} users. Are you sure you want to delete it? This will affect their permissions.`)) {
-          return
-        }
-      }
-
       const { error } = await supabase
         .from('roles')
         .delete()
-        .eq('id', id)
+        .eq('id', roleToDelete.id)
 
       if (error) throw error
 
-      toast({
-        title: "Success",
-        description: "Role deleted successfully",
-      })
-
+      showToast("Role deleted successfully", "success")
+      setShowDeleteDialog(false)
+      setRoleToDelete(null)
       loadRoles()
     } catch (error) {
       console.error('Error deleting role:', error)
-      toast({
-        title: "Error",
-        description: "Failed to delete role",
-        variant: "destructive",
-      })
+      showToast("Failed to delete role", "error")
     }
   }
 
@@ -196,8 +186,8 @@ export default function RolesPage() {
         </div>
         <div className="relative z-10 p-4">
           <div className="flex items-center justify-between mb-6">
-            <Button variant="ghost" size="icon" className="text-white" onClick={() => router.push('/admin')}>
-              <Menu className="h-6 w-6" />
+            <Button variant="ghost" size="icon" className="text-white" onClick={() => router.back()}>
+              <ArrowLeft className="h-6 w-6" />
             </Button>
             <div className="flex items-center gap-2">
               <Button
@@ -316,7 +306,10 @@ export default function RolesPage() {
               </div>
               
               {loading ? (
-                <div className="text-center py-8 text-gray-500">Loading roles...</div>
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+                  <p className="text-gray-500">Loading roles...</p>
+                </div>
               ) : roles.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   No roles found. Create your first role to get started.
@@ -373,7 +366,7 @@ export default function RolesPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleDelete(role.id)}
+                                onClick={() => handleDelete(role.id, role.name)}
                                 className="rounded-full text-red-600 hover:text-red-700"
                               >
                                 <Trash2 className="h-4 w-4" />

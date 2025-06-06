@@ -10,9 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Users, Plus, Edit, Trash2, UserCheck, UserX, Menu } from "lucide-react"
+import { Users, Plus, Edit, Trash2, UserCheck, UserX, ArrowLeft } from "lucide-react"
 import { supabase } from "@/lib/supabase"
-import { useToast } from "@/hooks/use-simple-toast"
+
 import { useAuth } from "@/hooks/useAuth"
 import Image from "next/image"
 
@@ -51,6 +51,7 @@ export default function UsersPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
+  const [isUpdating, setIsUpdating] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [formData, setFormData] = useState({
@@ -62,7 +63,24 @@ export default function UsersPage() {
     cellphone: ''
   })
   const [creating, setCreating] = useState(false)
-  const { toast } = useToast()
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [userToDelete, setUserToDelete] = useState<{ id: string; email: string } | null>(null)
+  
+  // Toast notification state
+  const [toast, setToast] = useState<{
+    show: boolean
+    message: string
+    type: 'success' | 'error'
+  }>({ show: false, message: '', type: 'success' })
+
+  // Toast notification function
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, message, type })
+    // Auto-dismiss after 4 seconds
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }))
+    }, 4000)
+  }
 
   useEffect(() => {
     loadData()
@@ -106,11 +124,7 @@ export default function UsersPage() {
       setRoles(rolesData as Role[] || [])
     } catch (error) {
       console.error('Error loading data:', error)
-      toast({
-        title: "Error",
-        description: "Failed to load data",
-        variant: "destructive",
-      })
+      showToast("Failed to load data", "error")
     } finally {
       setLoading(false)
     }
@@ -160,10 +174,7 @@ export default function UsersPage() {
         }
       }
 
-      toast({
-        title: "Success",
-        description: "User created successfully",
-      })
+      showToast("User created successfully", "success")
 
       setFormData({ 
         email: '', 
@@ -177,11 +188,7 @@ export default function UsersPage() {
       loadData()
     } catch (error) {
       console.error('Error creating user:', error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create user",
-        variant: "destructive",
-      })
+      showToast(error instanceof Error ? error.message : "Failed to create user", "error")
     } finally {
       setCreating(false)
     }
@@ -191,6 +198,7 @@ export default function UsersPage() {
     e.preventDefault()
     if (!editingUser) return
 
+    setIsUpdating(true)
     try {
       const { error } = await supabase
         .from('organization_users')
@@ -205,10 +213,7 @@ export default function UsersPage() {
 
       if (error) throw error
 
-      toast({
-        title: "Success",
-        description: "User updated successfully",
-      })
+      showToast("User updated successfully", "success")
 
       setEditingUser(null)
       setFormData({ 
@@ -222,11 +227,9 @@ export default function UsersPage() {
       loadData()
     } catch (error) {
       console.error('Error updating user:', error)
-      toast({
-        title: "Error",
-        description: "Failed to update user",
-        variant: "destructive",
-      })
+      showToast("Failed to update user", "error")
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -242,48 +245,38 @@ export default function UsersPage() {
 
       if (error) throw error
 
-      toast({
-        title: "Success",
-        description: `User ${!currentStatus ? 'activated' : 'deactivated'} successfully`,
-      })
+      showToast(`User ${!currentStatus ? 'activated' : 'deactivated'} successfully`, "success")
 
       loadData()
     } catch (error) {
       console.error('Error toggling user status:', error)
-      toast({
-        title: "Error",
-        description: "Failed to update user status",
-        variant: "destructive",
-      })
+      showToast("Failed to update user status", "error")
     }
   }
 
-  const handleDelete = async (userId: string, email: string) => {
-    if (!confirm(`Are you sure you want to delete ${email}? This action cannot be undone.`)) {
-      return
-    }
+  const handleDelete = (userId: string, email: string) => {
+    setUserToDelete({ id: userId, email })
+    setShowDeleteDialog(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!userToDelete) return
 
     try {
       const { error } = await supabase
         .from('organization_users')
         .delete()
-        .eq('id', userId)
+        .eq('id', userToDelete.id)
 
       if (error) throw error
 
-      toast({
-        title: "Success",
-        description: "User deleted successfully",
-      })
-
+      showToast("User deleted successfully", "success")
+      setShowDeleteDialog(false)
+      setUserToDelete(null)
       loadData()
     } catch (error) {
       console.error('Error deleting user:', error)
-      toast({
-        title: "Error",
-        description: "Failed to delete user",
-        variant: "destructive",
-      })
+      showToast("Failed to delete user", "error")
     }
   }
 
@@ -308,8 +301,8 @@ export default function UsersPage() {
         </div>
         <div className="relative z-10 p-4">
           <div className="flex items-center justify-between mb-6">
-            <Button variant="ghost" size="icon" className="text-white" onClick={() => router.push('/admin')}>
-              <Menu className="h-6 w-6" />
+            <Button variant="ghost" size="icon" className="text-white" onClick={() => router.back()}>
+              <ArrowLeft className="h-6 w-6" />
             </Button>
             <div className="flex items-center gap-2">
               <Button
@@ -496,7 +489,10 @@ export default function UsersPage() {
               </div>
               
               {loading ? (
-                <div className="text-center py-8 text-gray-500">Loading users...</div>
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+                  <p className="text-gray-500">Loading users...</p>
+                </div>
               ) : users.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   No users found. Create your first user to get started.
@@ -655,8 +651,19 @@ export default function UsersPage() {
                 </div>
 
                 <div className="flex gap-2 pt-4">
-                  <Button type="submit" className="bg-yellow-500 hover:bg-yellow-600 text-gray-800 rounded-full">
-                    Update User
+                  <Button 
+                    type="submit" 
+                    disabled={isUpdating}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-gray-800 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUpdating ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-800 mr-2"></div>
+                        Updating...
+                      </>
+                    ) : (
+                      'Update User'
+                    )}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => setEditingUser(null)} className="rounded-full">
                     Cancel
@@ -667,6 +674,85 @@ export default function UsersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="!fixed !inset-x-0 !bottom-0 !top-auto !left-0 !right-0 !transform-none !translate-x-0 !translate-y-0 mx-0 max-w-none !w-screen h-auto max-h-[70vh] rounded-t-3xl !rounded-b-none border-0 p-0 m-0">
+          <div className="flex flex-col w-full">
+            <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
+              <DialogTitle className="text-xl font-bold text-gray-800">Delete User</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 p-6">
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                  <Trash2 className="w-8 h-8 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    Are you sure you want to delete this user?
+                  </h3>
+                  <p className="text-gray-600">
+                    You're about to delete <span className="font-medium">{userToDelete?.email}</span>. 
+                    This action cannot be undone and will permanently remove the user from the system.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-4 mt-8">
+                <Button
+                  onClick={() => {
+                    setShowDeleteDialog(false)
+                    setUserToDelete(null)
+                  }}
+                  variant="outline"
+                  className="flex-1 rounded-full"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={confirmDelete}
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-full"
+                >
+                  Delete User
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className="fixed top-4 left-4 right-4 z-[100] flex justify-center">
+          <div
+            className={`flex items-center gap-3 p-4 rounded-[20px] shadow-lg transition-all duration-300 ease-in-out w-full max-w-sm ${
+              toast.type === 'success'
+                ? 'bg-green-500 text-white'
+                : 'bg-red-500 text-white'
+            } ${toast.show ? 'animate-slide-in-from-top' : 'animate-slide-out-to-top'}`}
+          >
+            <div className="flex-shrink-0">
+              {toast.type === 'success' ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+            <p className="text-sm font-medium flex-1">{toast.message}</p>
+            <button
+              onClick={() => setToast(prev => ({ ...prev, show: false }))}
+              className="flex-shrink-0 ml-2 hover:opacity-75 transition-opacity"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
