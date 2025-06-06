@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,6 +18,14 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const router = useRouter()
   const supabase = getSupabaseClient()
+
+  // Prevent scrolling on this page
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,11 +77,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 relative overflow-hidden">
+    <div className="h-screen w-screen bg-gray-100 relative overflow-hidden">
       {/* Background Image */}
       <div className="absolute inset-0">
         <Image
-          src="/images/splash-background.png"
+          src="/images/coal.gif"
           alt="Coal splash background"
           fill
           className="object-cover"
@@ -85,8 +91,8 @@ export default function LoginPage() {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-md bg-white/95 backdrop-blur-sm border-0 shadow-2xl">
+      <div className="relative z-10 h-screen flex items-end md:items-center justify-center p-0 md:p-4 overflow-hidden">
+        <Card className="mb-12 w-screen max-w-none rounded-b-none md:w-full md:max-w-lg md:rounded-[40px] bg-white border-0 rounded-t-[40px]">
           <CardContent className="p-8">
             {/* Logo */}
             <div className="text-center mb-8">
@@ -156,16 +162,11 @@ export default function LoginPage() {
 
               {error && <div className="text-red-500 text-sm text-center">{error}</div>}
 
-              <div className="text-right">
-                <button type="button" className="text-sm text-gray-500 hover:text-gray-700 italic">
-                  Forgot your password?
-                </button>
-              </div>
-
+              
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full h-12 bg-yellow-500 hover:bg-yellow-600 text-gray-800 font-semibold rounded-full border-0 shadow-lg"
+                className="mt-4 w-full h-12 bg-yellow-500 hover:bg-yellow-600 text-gray-800 font-semibold rounded-full border-0"
               >
                 {loading ? (
                   "Logging in..."

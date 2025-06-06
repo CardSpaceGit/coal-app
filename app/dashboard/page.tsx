@@ -659,9 +659,19 @@ export default function DashboardPage() {
     }
   }
 
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push("/login")
+    setIsLoggingOut(true)
+    try {
+      console.log("Logging out user...")
+      await supabase.auth.signOut()
+      router.push("/login")
+    } catch (error) {
+      console.error("Error during logout:", error)
+    } finally {
+      setIsLoggingOut(false)
+    }
   }
 
   if (authLoading || loading) {
@@ -2256,7 +2266,7 @@ export default function DashboardPage() {
             {/* Background Image */}
             <div className="absolute inset-0">
               <Image
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-fpCROtueB4PgwWN8KyRDy1GesDbbBn.png"
+                src="/images/coal.gif"
                 alt="Coal background"
                 fill
                 className="object-cover"
@@ -2296,14 +2306,19 @@ export default function DashboardPage() {
                 {/* Log Out Button */}
                 <button
                   onClick={handleLogout}
-                  className="flex items-center justify-between w-full text-white text-xl font-light py-4 border-b border-white/20"
+                  disabled={isLoggingOut}
+                  className="flex items-center justify-between w-full text-white text-xl font-light py-4 border-b border-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span>Log Out</span>
-                  <ArrowRight size={24} />
+                  <span>{isLoggingOut ? "Logging out..." : "Log Out"}</span>
+                  {isLoggingOut ? (
+                    <div className="w-6 h-6 animate-spin rounded-full border-b-2 border-white"></div>
+                  ) : (
+                    <ArrowRight size={24} />
+                  )}
                 </button>
 
                 {/* Footer */}
-                <p className="text-sm text-white/75">Build and powered by FT Coal © 2024.</p>
+                <p className="text-sm text-white/75">Build and powered by FT Coal © 2025.</p>
               </div>
             </div>
           </div>
