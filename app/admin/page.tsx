@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { SlideOutMenu } from "@/components/ui/slide-out-menu"
 import { Users, Building2, Shield, Plus, Menu, Warehouse, Package, Edit, Trash2 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/hooks/useAuth"
@@ -189,6 +190,10 @@ export default function AdminDashboard() {
     type: 'success' | 'error'
   }>({ show: false, message: '', type: 'success' })
 
+  // Slide-out menu state
+  const [showSideMenu, setShowSideMenu] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
   // Toast notification function
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ show: true, message, type })
@@ -196,6 +201,20 @@ export default function AdminDashboard() {
     setTimeout(() => {
       setToast(prev => ({ ...prev, show: false }))
     }, 4000)
+  }
+
+  // Logout function
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      console.log("Logging out user...")
+      await supabase.auth.signOut()
+      router.push("/login")
+    } catch (error) {
+      console.error("Error during logout:", error)
+    } finally {
+      setIsLoggingOut(false)
+    }
   }
 
   useEffect(() => {
@@ -1055,7 +1074,7 @@ export default function AdminDashboard() {
         </div>
         <div className="relative z-10 p-4">
           <div className="flex items-center justify-between mb-6">
-            <Button variant="ghost" size="icon" className="text-white" onClick={() => router.push('/dashboard')}>
+            <Button variant="ghost" size="icon" className="text-white" onClick={() => setShowSideMenu(true)}>
               <Menu className="h-6 w-6" />
             </Button>
             <div className="flex items-center gap-2">
@@ -2687,6 +2706,14 @@ export default function AdminDashboard() {
 
 
       </div>
+
+      {/* Slide-out Menu */}
+      <SlideOutMenu
+        isOpen={showSideMenu}
+        onClose={() => setShowSideMenu(false)}
+        onLogout={handleLogout}
+        isLoggingOut={isLoggingOut}
+      />
       
       {/* Toast Notification */}
       {toast.show && (
