@@ -78,17 +78,7 @@ export default function EditDeliveryPage() {
         return
       }
 
-      // Get organization details to access coal_yard_names
-      const { data: orgData } = await supabase
-        .from("organizations")
-        .select("coal_yard_names")
-        .eq("id", (userData as any).organization_id)
-        .single()
-
-      if (!orgData?.coal_yard_names) {
-        console.error("Organization coal yard names not found")
-        return
-      }
+      // Organization ID is available from userData
 
       // Load the specific delivery data
       const { data: delivery, error: deliveryError } = await supabase
@@ -128,11 +118,11 @@ export default function EditDeliveryPage() {
           .in("name", orgData2.product_names as string[])
           .order("name"),
         
-        // Get yards for this organization based on coal_yard_names array
+        // Get yards for this organization based on organization_ids array in coal_yards table
         supabase
           .from("coal_yards")
           .select("*")
-          .in("name", orgData.coal_yard_names as string[])
+          .overlaps("organization_ids", [(userData as any).organization_id])
           .order("name")
       ])
 

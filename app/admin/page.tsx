@@ -31,7 +31,6 @@ interface Organization {
   description: string | null
   website: string | null
   product_names: string[]
-  coal_yard_names: string[]
   created_at: string
   updated_at: string
 }
@@ -272,7 +271,7 @@ export default function AdminDashboard() {
     try {
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, name, slug, description, website, product_names, coal_yard_names, created_at, updated_at')
+        .select('id, name, slug, description, website, product_names, created_at, updated_at')
         .order('name')
 
       if (error) throw error
@@ -608,6 +607,15 @@ export default function AdminDashboard() {
 
     setIsUpdatingYard(true)
     try {
+      console.log('Updating coal yard with data:', {
+        name: yardFormData.name,
+        code: yardFormData.code,
+        image_url: yardFormData.image_url || null,
+        location: yardFormData.location || null,
+        organization_ids: yardFormData.organization_ids,
+      })
+      console.log('Editing yard ID:', editingYard.id)
+
       const { error } = await supabase
         .from('coal_yards')
         .update({
@@ -615,8 +623,7 @@ export default function AdminDashboard() {
           code: yardFormData.code,
           image_url: yardFormData.image_url || null,
           location: yardFormData.location || null,
-          organization_ids: yardFormData.organization_ids,
-          updated_at: new Date().toISOString()
+          organization_ids: yardFormData.organization_ids
         })
         .eq('id', editingYard.id)
 
@@ -628,7 +635,22 @@ export default function AdminDashboard() {
       loadCoalYards()
     } catch (error) {
       console.error('Error updating coal yard:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      console.error('Error type:', typeof error)
+      console.error('Error constructor:', error?.constructor?.name)
+      
+      let errorMessage = 'Unknown error occurred'
+      if (error && typeof error === 'object') {
+        if ('message' in error && error.message) {
+          errorMessage = error.message
+        } else if ('details' in error && error.details) {
+          errorMessage = error.details
+        } else if ('hint' in error && error.hint) {
+          errorMessage = error.hint
+        } else {
+          errorMessage = JSON.stringify(error)
+        }
+      }
+      
       showToast(`Failed to update coal yard: ${errorMessage}`, "error")
     } finally {
       setIsUpdatingYard(false)
@@ -1232,14 +1254,14 @@ export default function AdminDashboard() {
                 Organizations
               </button>
               <button
-                onClick={() => setActiveTab("products")}
+                onClick={() => setActiveTab("users")}
                 className={`text-xl pb-1 transition-all ${
-                  activeTab === "products"
+                  activeTab === "users"
                     ? "font-bold text-gray-800 border-b-2 border-gray-800"
                     : "font-light text-gray-500 hover:text-gray-700"
                 }`}
               >
-                Products
+                Users
               </button>
               <button
                 onClick={() => setActiveTab("coal-yards")}
@@ -1252,6 +1274,16 @@ export default function AdminDashboard() {
                 Coal Yards
               </button>
               <button
+                onClick={() => setActiveTab("products")}
+                className={`text-xl pb-1 transition-all ${
+                  activeTab === "products"
+                    ? "font-bold text-gray-800 border-b-2 border-gray-800"
+                    : "font-light text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Products
+              </button>
+              <button
                 onClick={() => setActiveTab("roles")}
                 className={`text-xl pb-1 transition-all ${
                   activeTab === "roles"
@@ -1260,16 +1292,6 @@ export default function AdminDashboard() {
                 }`}
               >
                 Roles
-              </button>
-              <button
-                onClick={() => setActiveTab("users")}
-                className={`text-xl pb-1 transition-all ${
-                  activeTab === "users"
-                    ? "font-bold text-gray-800 border-b-2 border-gray-800"
-                    : "font-light text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                Users
               </button>
                     </div>
 
@@ -1880,19 +1902,19 @@ export default function AdminDashboard() {
                                                               <Checkbox
                                 id={`yard-org-${org.id}`}
                                 checked={yardFormData.organization_ids?.includes(org.id) || false}
-                                onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      setYardFormData({
-                                        ...yardFormData,
-                                        organization_ids: [...yardFormData.organization_ids, org.id]
-                                      })
-                                    } else {
-                                      setYardFormData({
-                                        ...yardFormData,
-                                        organization_ids: yardFormData.organization_ids.filter(id => id !== org.id)
-                                      })
-                                    }
-                                  }}
+                                                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setYardFormData({
+                                      ...yardFormData,
+                                      organization_ids: [...(yardFormData.organization_ids || []), org.id]
+                                    })
+                                  } else {
+                                    setYardFormData({
+                                      ...yardFormData,
+                                      organization_ids: (yardFormData.organization_ids || []).filter(id => id !== org.id)
+                                    })
+                                  }
+                                }}
                                 />
                                 <Label
                                   htmlFor={`yard-org-${org.id}`}
@@ -2063,12 +2085,12 @@ export default function AdminDashboard() {
                                   if (checked) {
                                     setYardFormData({
                                       ...yardFormData,
-                                      organization_ids: [...yardFormData.organization_ids, org.id]
+                                      organization_ids: [...(yardFormData.organization_ids || []), org.id]
                                     })
                                   } else {
                                     setYardFormData({
                                       ...yardFormData,
-                                      organization_ids: yardFormData.organization_ids.filter(id => id !== org.id)
+                                      organization_ids: (yardFormData.organization_ids || []).filter(id => id !== org.id)
                                     })
                                   }
                                 }}

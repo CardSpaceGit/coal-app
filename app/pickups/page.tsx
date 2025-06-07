@@ -328,15 +328,15 @@ export default function PickupsPage() {
 
       console.log("✅ User data:", userData)
 
-      // OPTIMIZED: Get both coal_yard_names and product_names in single query
+      // OPTIMIZED: Get product_names from organization
       const { data: orgData } = await supabase
         .from("organizations")
-        .select("coal_yard_names, product_names")
+        .select("product_names")
         .eq("id", (userData as any).organization_id)
         .single()
 
-      if (!orgData?.coal_yard_names || !orgData?.product_names) {
-        console.error("❌ Organization names not found")
+      if (!orgData?.product_names) {
+        console.error("❌ Organization product names not found")
         return
       }
 
@@ -351,11 +351,11 @@ export default function PickupsPage() {
           .in("name", orgData.product_names as string[])
           .order("name"),
         
-        // Get yards for this organization based on coal_yard_names array
+        // Get yards for this organization based on organization_ids array in coal_yards table
         supabase
           .from("coal_yards")
           .select("*")
-          .in("name", orgData.coal_yard_names as string[])
+          .overlaps("organization_ids", [(userData as any).organization_id])
           .order("name")
       ])
 

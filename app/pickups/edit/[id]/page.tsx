@@ -62,6 +62,9 @@ export default function EditPickupPage() {
   const [productStock, setProductStock] = useState<Record<string, number>>({})
   const [showSuggestions, setShowSuggestions] = useState<Record<string, boolean>>({})
   const [filteredSuggestions, setFilteredSuggestions] = useState<Record<string, string[]>>({})
+  // New states for tracking original pickup weights and maximum allowable weights
+  const [originalPickupWeights, setOriginalPickupWeights] = useState<Record<string, number>>({})
+  const [maxAllowableWeights, setMaxAllowableWeights] = useState<Record<string, number>>({})
   
   const containerNumbers = [
     "2685504", "2685582", "2687693", "2687796", "2688220", "2693818", "2688853", "2628263", "1685417", "2678773",
@@ -72,6 +75,29 @@ export default function EditPickupPage() {
   ]
   
   const supabase = getSupabaseClient()
+
+  // Function to calculate maximum allowable weight for a product
+  const calculateMaxAllowableWeight = (productId: string, yardId: string): number => {
+    const currentStock = productStock[productId] || 0
+    const originalWeight = originalPickupWeights[productId] || 0
+    return currentStock + originalWeight
+  }
+
+  // Function to update maximum allowable weights when product selection changes
+  const updateMaxAllowableWeights = () => {
+    const newMaxWeights: Record<string, number> = {}
+    
+    containers.forEach(container => {
+      container.products.forEach(product => {
+        if (product.productId && selectedYard) {
+          const key = `${container.id}_${product.id}`
+          newMaxWeights[key] = calculateMaxAllowableWeight(product.productId, selectedYard)
+        }
+      })
+    })
+    
+    setMaxAllowableWeights(newMaxWeights)
+  }
 
   // Audit logging function
   const logAuditTrail = async (action: string, oldValues: any, newValues: any, organizationId: string, newPickupIds: string[]) => {
@@ -112,6 +138,13 @@ export default function EditPickupPage() {
     }
   }, [user, authLoading, pickupId])
 
+  // Update max allowable weights when product stock, original weights, or containers change
+  useEffect(() => {
+    if (selectedYard && Object.keys(productStock).length > 0 && Object.keys(originalPickupWeights).length > 0) {
+      updateMaxAllowableWeights()
+    }
+  }, [productStock, originalPickupWeights, containers, selectedYard])
+
   const loadData = async () => {
     try {
       setInitialLoading(true)
@@ -135,17 +168,7 @@ export default function EditPickupPage() {
         return
       }
 
-      // Get organization details to access coal_yard_names
-      const { data: orgData } = await supabase
-        .from("organizations")
-        .select("coal_yard_names")
-        .eq("id", (userData as any).organization_id)
-        .single()
-
-      if (!orgData?.coal_yard_names) {
-        console.error("Organization coal yard names not found")
-        return
-      }
+      // Organization ID is available from userData
 
       // Get pickup data
       const { data: pickups, error: pickupError } = await supabase
@@ -199,6 +222,16 @@ export default function EditPickupPage() {
       setContainers(containersArray)
       setOriginalContainers(JSON.parse(JSON.stringify(containersArray))) // Deep copy for comparison
 
+      // Calculate original pickup weights by product for max weight validation
+      const originalWeights: Record<string, number> = {}
+      ;(pickups as any[]).forEach((record: any) => {
+        const productId = record.product_id
+        if (productId) {
+          originalWeights[productId] = (originalWeights[productId] || 0) + (record.weight_tons || 0)
+        }
+      })
+      setOriginalPickupWeights(originalWeights)
+
       // Get organization details to access product_names
       const { data: orgData2 } = await supabase
         .from("organizations")
@@ -220,11 +253,11 @@ export default function EditPickupPage() {
           .in("name", orgData2.product_names as string[])
           .order("name"),
         
-        // Get yards for this organization based on coal_yard_names array
+        // Get yards for this organization based on organization_ids array in coal_yards table
         supabase
           .from("coal_yards")
           .select("*")
-          .in("name", orgData.coal_yard_names as string[])
+          .overlaps("organization_ids", [(userData as any).organization_id])
           .order("name")
       ])
 
@@ -441,6 +474,9 @@ export default function EditPickupPage() {
           : c,
       ),
     )
+    
+    // Trigger max weight recalculation after a brief delay to allow state update
+    setTimeout(() => updateMaxAllowableWeights(), 100)
   }
 
   const handleContainerNumberChange = (containerId: string, value: string) => {
@@ -694,6 +730,8 @@ export default function EditPickupPage() {
                       onClick={() => {
                         setSelectedYard(yard.id)
                         loadCurrentStock(yard.id)
+                        // Trigger max weight recalculation after yard change
+                        setTimeout(() => updateMaxAllowableWeights(), 200)
                       }}
                       className={`relative rounded-[32px] border-2 p-3 transition-all ${
                         selectedYard === yard.id ? "border-yellow-500 bg-yellow-50" : "border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300"
@@ -923,20 +961,44 @@ export default function EditPickupPage() {
 
                           <div>
                             <Label className="text-sm text-gray-600">Weight for this product</Label>
-                            <div className="relative mt-1">
-                              <Input
-                                type="number"
-                                step="any"
-                                value={product.weight}
-                                onChange={(e) => updateProductInContainer(container.id, product.id, "weight", e.target.value)}
-                                placeholder="1,000"
-                                className="pr-16 rounded-full border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              />
-                              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                                <Weight className="h-4 w-4 text-gray-400" />
-                                <span className="text-md text-gray-500">t</span>
-                              </div>
-                            </div>
+                            {(() => {
+                              const maxWeight = maxAllowableWeights[`${container.id}_${product.id}`] || 0
+                              const currentWeight = parseFloat(product.weight) || 0
+                              const isOverMax = currentWeight > maxWeight
+                              const currentStock = productStock[product.productId] || 0
+                              const originalWeight = originalPickupWeights[product.productId] || 0
+                              
+                              return (
+                                <>
+                                  {maxWeight > 0 && (
+                                    <div className="text-xs text-gray-500 mt-1 mb-2">
+                                      Maximum: {maxWeight.toLocaleString()}t (Current stock: {currentStock.toLocaleString()}t + Original pickup: {originalWeight.toLocaleString()}t)
+                                    </div>
+                                  )}
+                                  <div className="relative mt-1">
+                                    <Input
+                                      type="number"
+                                      step="any"
+                                      value={product.weight}
+                                      onChange={(e) => updateProductInContainer(container.id, product.id, "weight", e.target.value)}
+                                      placeholder="1,000"
+                                      className={`pr-16 rounded-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                                        isOverMax ? "border-red-500 bg-red-50" : "border-gray-300"
+                                      }`}
+                                    />
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                      <Weight className="h-4 w-4 text-gray-400" />
+                                      <span className="text-md text-gray-500">t</span>
+                                    </div>
+                                  </div>
+                                  {isOverMax && (
+                                    <div className="text-xs text-red-500 mt-1">
+                                      Weight exceeds maximum allowable amount of {maxWeight.toLocaleString()}t
+                                    </div>
+                                  )}
+                                </>
+                              )
+                            })()}
                           </div>
                         </div>
                       </div>
@@ -961,7 +1023,12 @@ export default function EditPickupPage() {
             disabled={
               loading ||
               !selectedYard ||
-              containers.some((c) => !c.containerNumber || c.products.some((p) => !p.productId || !p.weight))
+              containers.some((c) => !c.containerNumber || c.products.some((p) => !p.productId || !p.weight)) ||
+              containers.some((c) => c.products.some((p) => {
+                const maxWeight = maxAllowableWeights[`${c.id}_${p.id}`] || 0
+                const currentWeight = parseFloat(p.weight) || 0
+                return currentWeight > maxWeight && maxWeight > 0
+              }))
             }
             className="bg-yellow-500 hover:bg-yellow-600 text-gray-800 font-semibold px-8 py-3 rounded-full"
           >

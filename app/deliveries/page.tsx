@@ -90,15 +90,15 @@ export default function DeliveriesPage() {
 
       console.log("✅ Deliveries: User data:", userData)
 
-      // OPTIMIZED: Get both coal_yard_names and product_names in single query
+      // OPTIMIZED: Get product_names from organization
       const { data: orgData } = await supabase
         .from("organizations")
-        .select("coal_yard_names, product_names")
+        .select("product_names")
         .eq("id", (userData as any).organization_id)
         .single()
 
-      if (!orgData?.coal_yard_names || !orgData?.product_names) {
-        console.error("❌ Deliveries: Organization names not found")
+      if (!orgData?.product_names) {
+        console.error("❌ Deliveries: Organization product names not found")
         return
       }
 
@@ -113,11 +113,11 @@ export default function DeliveriesPage() {
           .in("name", orgData.product_names as string[])
           .order("name"),
         
-        // Get yards for this organization based on coal_yard_names array
+        // Get yards for this organization based on organization_ids array in coal_yards table
         supabase
           .from("coal_yards")
           .select("*")
-          .in("name", orgData.coal_yard_names as string[])
+          .overlaps("organization_ids", [(userData as any).organization_id])
           .order("name")
       ])
 
@@ -125,6 +125,18 @@ export default function DeliveriesPage() {
 
       // Set products and yards immediately for faster UI response
       if (productsResult.data) setProducts(productsResult.data as unknown as Product[])
+      
+      console.log("🔍 Deliveries: Yards query result:", { 
+        data: allYardsResult.data, 
+        error: allYardsResult.error,
+        dataLength: allYardsResult.data?.length
+      })
+      
+      if (allYardsResult.error) {
+        console.error("❌ Deliveries: Error fetching yards:", allYardsResult.error)
+        setInitialLoading(false)
+        return
+      }
       
       if (allYardsResult.data && allYardsResult.data.length > 0) {
         console.log("✅ Deliveries: Setting coal yards:", allYardsResult.data)
@@ -155,6 +167,7 @@ export default function DeliveriesPage() {
         }
       } else {
         console.log("❌ Deliveries: No yards data found or empty array")
+        console.log("🔍 Deliveries: User organization ID:", (userData as any).organization_id)
         setInitialLoading(false)
       }
     } catch (error) {

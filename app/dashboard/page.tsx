@@ -117,6 +117,13 @@ export default function DashboardPage() {
     }
   }, [authLoading, user, selectedYardFilter, dateRange])
 
+  // Reset navigation loading state when component unmounts or route changes
+  useEffect(() => {
+    return () => {
+      setIsNavigating(false)
+    }
+  }, [])
+
   // Generate real-time Grok analysis when ANY operational activity occurs
   useEffect(() => {
     if (deliveryData.length > 0 || pickupData.length > 0) {
@@ -239,27 +246,18 @@ export default function DashboardPage() {
     try {
       console.log("🔍 Dashboard: Loading coal yards for organization:", user.organization.id)
       
-      // Get organization details to access coal_yard_names
-      const { data: orgData } = await supabase
-        .from("organizations")
-        .select("coal_yard_names")
-        .eq("id", user.organization.id)
-        .single()
-
-      if (!orgData?.coal_yard_names) {
-        console.error("❌ Dashboard: Organization coal yard names not found")
+      // Get yards for this organization based on organization_ids array in coal_yards table
+      const { data, error } = await supabase
+        .from("coal_yards")
+        .select("*")
+        .overlaps("organization_ids", [user.organization.id])
+        .order("name")
+      
+      if (error) {
+        console.error("❌ Dashboard: Error loading coal yards:", error)
         setCoalYards([])
         return
       }
-
-      console.log("✅ Dashboard: Organization coal yard names:", orgData.coal_yard_names)
-
-      // Get yards for this organization based on coal_yard_names array
-      const { data } = await supabase
-        .from("coal_yards")
-        .select("*")
-        .in("name", orgData.coal_yard_names as string[])
-        .order("name")
       
       console.log("✅ Dashboard: Loaded coal yards:", data)
       
@@ -661,6 +659,7 @@ export default function DashboardPage() {
   }
 
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [isNavigating, setIsNavigating] = useState(false)
 
   const handleLogout = async () => {
     setIsLoggingOut(true)
@@ -2353,6 +2352,7 @@ export default function DashboardPage() {
             <div className="flex-1 px-4 sm:px-6 py-4 sm:py-6 space-y-3 sm:space-y-4">
               <Button
                 onClick={() => {
+                  setIsNavigating(true)
                   setShowDropdownModal(false)
                   if (recordType === 'delivery') {
                     router.push(`/deliveries/edit/${selectedRecord?.id}`)
@@ -2360,16 +2360,25 @@ export default function DashboardPage() {
                     router.push(`/pickups/edit/${selectedRecord?.id}`)
                   }
                 }}
+                disabled={isNavigating}
                 variant="outline"
-                className="w-full h-14 sm:h-16 rounded-[24px] sm:rounded-[24px] justify-start text-left hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                className="w-full h-14 sm:h-16 rounded-[24px] sm:rounded-[24px] justify-start text-left hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center gap-3 sm:gap-4 w-full">
                   <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-xl sm:rounded-[24px] flex items-center justify-center flex-shrink-0">
-                    <Edit size={20} className="sm:size-6 text-gray-600" />
+                    {isNavigating ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
+                    ) : (
+                      <Edit size={20} className="sm:size-6 text-gray-600" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-800 text-base sm:text-lg truncate">Edit record</h3>
-                    <p className="text-xs sm:text-sm text-gray-500 truncate">Modify this {recordType} record</p>
+                    <h3 className="font-semibold text-gray-800 text-base sm:text-lg truncate">
+                      {isNavigating ? "Opening editor..." : "Edit record"}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-gray-500 truncate">
+                      {isNavigating ? "Please wait..." : `Modify this ${recordType} record`}
+                    </p>
                   </div>
                 </div>
               </Button>
