@@ -2258,6 +2258,14 @@ export default function DashboardPage() {
         isOpen={showSideMenu}
         onClose={() => setShowSideMenu(false)}
         onLogout={handleLogout}
+        onProfile={() => {
+          setShowSideMenu(false)
+          router.push("/profile")
+        }}
+        onDashboard={() => {
+          // Already on dashboard page, just close the menu
+          setShowSideMenu(false)
+        }}
         isLoggingOut={isLoggingOut}
       />
 

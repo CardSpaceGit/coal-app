@@ -1,15 +1,17 @@
 import React from "react"
 import Image from "next/image"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, User, LayoutDashboard } from "lucide-react"
 
 interface SlideOutMenuProps {
   isOpen: boolean
   onClose: () => void
   onLogout: () => void
+  onProfile: () => void
+  onDashboard: () => void
   isLoggingOut?: boolean
 }
 
-export function SlideOutMenu({ isOpen, onClose, onLogout, isLoggingOut = false }: SlideOutMenuProps) {
+export function SlideOutMenu({ isOpen, onClose, onLogout, onProfile, onDashboard, isLoggingOut = false }: SlideOutMenuProps) {
   if (!isOpen) return null
 
   return (
@@ -63,6 +65,24 @@ export function SlideOutMenu({ isOpen, onClose, onLogout, isLoggingOut = false }
 
           {/* Bottom Section */}
           <div className="space-y-6">
+            {/* Dashboard Button */}
+            <button
+              onClick={onDashboard}
+              className="flex items-center justify-between w-full text-white text-xl font-light py-4 border-b border-white/20"
+            >
+              <span>Dashboard</span>
+              <ArrowRight size={24} />
+            </button>
+
+            {/* Profile Button */}
+            <button
+              onClick={onProfile}
+              className="flex items-center justify-between w-full text-white text-xl font-light py-4 border-b border-white/20"
+            >
+              <span>Profile</span>
+              <ArrowRight size={24} />
+            </button>
+
             {/* Log Out Button */}
             <button
               onClick={onLogout}

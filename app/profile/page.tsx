@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
-import { ArrowLeft, User, Mail, Eye, EyeOff, Lock } from "lucide-react"
+import { ArrowLeft, User, Mail, Eye, EyeOff, Lock, Menu } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
 import { useAuth } from "@/hooks/useAuth"
 import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
+import { SlideOutMenu } from "@/components/ui/slide-out-menu"
 
 export default function ProfilePage() {
   const { user, loading: authLoading } = useAuth()
@@ -22,6 +23,8 @@ export default function ProfilePage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [showSideMenu, setShowSideMenu] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const router = useRouter()
   const supabase = getSupabaseClient()
   const { toast } = useToast()
@@ -49,8 +52,8 @@ export default function ProfilePage() {
         .eq("user_id", user.user_id)
         .single()
 
-      if (profileData) {
-        setFullName(profileData.full_name)
+      if (profileData && profileData.full_name) {
+        setFullName(profileData.full_name as string)
       }
     } catch (error) {
       console.error("Error loading profile data:", error)
@@ -140,8 +143,15 @@ export default function ProfilePage() {
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push("/login")
+    setIsLoggingOut(true)
+    try {
+      await supabase.auth.signOut()
+      router.push("/login")
+    } catch (error) {
+      console.error("Logout error:", error)
+    } finally {
+      setIsLoggingOut(false)
+    }
   }
 
   if (authLoading || !user) {
@@ -149,27 +159,49 @@ export default function ProfilePage() {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading profile...</p>
+          <p className="text-gray-600">Loading your profile...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 p-4">
-        <div className="flex items-center">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-semibold ml-4">Profile</h1>
+    <div className="min-h-screen bg-gray-100">
+      {/* Header - Coal themed like dashboard */}
+      <div className="bg-gray-900 text-white relative overflow-hidden">
+        <div className="absolute inset-0 opacity-20">
+          <Image src="/images/coal-texture.png" alt="Coal texture background" fill className="object-cover" priority />
+        </div>
+        <div className="relative z-10 p-4">
+          <div className="flex items-center justify-between mb-6">
+            <Button variant="ghost" size="icon" className="text-white" onClick={() => setShowSideMenu(true)}>
+              <Menu className="h-6 w-6" />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-white" onClick={() => router.back()}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="mb-4">
+            <h1 className="text-2xl font-light">
+              <span className="font-bold">Profile Settings</span>{" "}
+              <span className="italic">manage your account.</span>
+            </h1>
+            <div className="flex flex-col gap-1 mt-2">
+              <span className="text-sm text-gray-300">{user.organization?.name}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">Role:</span>
+                <span className="text-xs bg-yellow-500 text-gray-900 px-3 py-1 rounded-full font-medium">
+                  {user.role?.name || 'No Role Assigned'}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="p-4 space-y-6">
+      <div className="p-4 space-y-6 mt-2 pb-24">
         {/* Profile Header */}
-        <Card>
+        <Card className="bg-white rounded-[32px]">
           <CardContent className="p-6 text-center">
             <div className="relative inline-block mb-4">
               {user.avatar_url ? (
@@ -195,10 +227,10 @@ export default function ProfilePage() {
         </Card>
 
         {/* Profile Details */}
-        <Card>
+        <Card className="bg-white rounded-[32px]">
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Profile details</h3>
-            <p className="text-sm text-gray-600 mb-6">Review all past and present incoming coal load records.</p>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Profile Details</h3>
+            <p className="text-sm text-gray-600 mb-6">Update your personal information and contact details.</p>
 
             <div className="space-y-4">
               <div>
@@ -215,7 +247,7 @@ export default function ProfilePage() {
               </div>
 
               <div>
-                <Label className="text-sm font-medium text-gray-700">Email address</Label>
+                <Label className="text-sm font-medium text-gray-700">Email Address</Label>
                 <div className="relative mt-1">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
@@ -233,10 +265,10 @@ export default function ProfilePage() {
         </Card>
 
         {/* Update Password */}
-        <Card>
+        <Card className="bg-white rounded-[32px]">
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Update Password</h3>
-            <p className="text-sm text-gray-600 mb-6">Add a new password to update your profile.</p>
+            <p className="text-sm text-gray-600 mb-6">Add a new password to update your profile security.</p>
 
             <div className="space-y-4">
               <div>
@@ -246,7 +278,7 @@ export default function ProfilePage() {
                     type={showCurrentPassword ? "text" : "password"}
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="enter current password"
+                    placeholder="Enter current password"
                     className="rounded-full border-2 border-gray-300 pr-12"
                   />
                   <button
@@ -266,7 +298,7 @@ export default function ProfilePage() {
                     type={showNewPassword ? "text" : "password"}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="enter new password"
+                    placeholder="Enter new password"
                     className="rounded-full border-2 border-gray-300 pr-12"
                   />
                   <button
@@ -286,7 +318,7 @@ export default function ProfilePage() {
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="confirm new password"
+                    placeholder="Confirm new password"
                     className="rounded-full border-2 border-gray-300 pr-12"
                   />
                   <button
@@ -311,6 +343,22 @@ export default function ProfilePage() {
           {loading ? "Saving..." : "SAVE CHANGES"}
         </Button>
       </div>
+
+      {/* Slide-out Menu */}
+      <SlideOutMenu
+        isOpen={showSideMenu}
+        onClose={() => setShowSideMenu(false)}
+        onLogout={handleLogout}
+        onProfile={() => {
+          // Already on profile page, just close the menu
+          setShowSideMenu(false)
+        }}
+        onDashboard={() => {
+          setShowSideMenu(false)
+          router.push("/dashboard")
+        }}
+        isLoggingOut={isLoggingOut}
+      />
     </div>
   )
 }
